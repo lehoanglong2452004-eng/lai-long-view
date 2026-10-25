@@ -53,6 +53,15 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 2p
 }
 .brand { display: flex; align-items: center; gap: 6px; font-weight: 600; letter-spacing: 0.08em; margin-right: 4px; }
 .brand img { width: 20px; height: 20px; }
+.brand { position: relative; cursor: default; }
+.brand::after {
+  content: attr(data-tip);
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+  white-space: nowrap; padding: 4px 8px; font-size: 11px; font-weight: 400; letter-spacing: 0;
+  background: var(--text); color: var(--bg); border-radius: 2px;
+  opacity: 0; pointer-events: none; transition: opacity 0.12s;
+}
+.brand:hover::after { opacity: 1; }
 .group { display: flex; gap: 2px; }
 .tfs button { min-width: 34px; }
 
