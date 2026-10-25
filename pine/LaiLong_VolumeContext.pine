@@ -1,0 +1,849 @@
+// Lai Long Volume Context — Wyckoff (cung–cầu, nhân–quả, nỗ lực–kết quả) + 31 mẫu hình khối lượng + VWAP + Volume Profile.
+// Luật phân tích: docs/SPEC.md. Giữ đồng bộ với src/engine/ của web Lai Long View.
+// Chỉ để tham khảo. Điểm mẫu hình là mức khớp luật, không phải tỉ lệ thắng.
+
+//@version=6
+indicator("Lai Long Volume Context", shorttitle = "LaiLong", overlay = true, max_labels_count = 500, max_boxes_count = 500, max_lines_count = 100, max_bars_back = 5000)
+
+// ───────────────────────────── Inputs
+string G0 = "Chung / General"
+string lang = input.string("VI", "Ngôn ngữ / Language", options = ["VI", "EN"], group = G0)
+
+string G1 = "Nỗ lực – kết quả / Effort – result"
+int   volLen  = input.int(20, "SMA volume", minval = 5, group = G1)
+int   atrLen  = input.int(14, "ATR", minval = 5, group = G1)
+float kHi     = input.float(1.5, "RVOL cao / high", step = 0.1, group = G1)
+float kLo     = input.float(0.7, "RVOL thấp / low", step = 0.1, group = G1)
+float kUltra  = input.float(2.5, "RVOL cực đại / ultra", step = 0.1, group = G1)
+float kWide   = input.float(1.3, "Biên độ rộng / wide (ATR)", step = 0.1, group = G1)
+float kNarrow = input.float(0.7, "Biên độ hẹp / narrow (ATR)", step = 0.1, group = G1)
+
+string G2 = "Cấu trúc / Structure"
+int   pivL     = input.int(5, "Pivot trái / left", minval = 2, group = G2)
+int   pivR     = input.int(5, "Pivot phải / right", minval = 2, group = G2)
+int   rangeLen = input.int(30, "Sideway: số nến / bars", minval = 10, group = G2)
+float rangeAtr = input.float(6.0, "Sideway: độ rộng tối đa (ATR) / max width", step = 0.5, group = G2)
+int   decay    = input.int(40, "Độ tươi sự kiện (nến) / event decay", minval = 10, group = G2)
+
+string G3 = "Hiển thị / Display"
+bool   showEvents = input.bool(true, "Nhãn sự kiện Wyckoff / event labels", group = G3)
+bool   showMinor  = input.bool(false, "Cả sự kiện nhỏ (NS, ND, ABS) / minor events", group = G3)
+bool   showBoxes  = input.bool(true, "Hộp vùng sideway / range boxes", group = G3)
+bool   showTable  = input.bool(true, "Bảng bối cảnh / context table", group = G3)
+string tablePosIn = input.string("Trên phải", "Vị trí bảng / table position", options = ["Trên phải", "Trên trái", "Dưới phải", "Dưới trái"], group = G3)
+color  cUp        = input.color(#127a55, "Tăng / up", group = G3)
+color  cDn        = input.color(#c23a2b, "Giảm / down", group = G3)
+
+string G4 = "VWAP"
+bool  showVwapD = input.bool(true, "VWAP phiên / session", group = G4)
+bool  showVwapW = input.bool(true, "VWAP tuần / weekly", group = G4)
+bool  showVwapM = input.bool(false, "VWAP tháng / monthly", group = G4)
+bool  showBands = input.bool(false, "Dải ±1σ ±2σ của VWAP phiên / session bands", group = G4)
+bool  showAvwap = input.bool(true, "AVWAP tự neo (SC/Spring/SOS · BC/UT/SOW)", group = G4)
+color cVwD      = input.color(#e08a00, "Màu VWAP phiên", group = G4)
+color cVwW      = input.color(#2b5fb8, "Màu VWAP tuần", group = G4)
+color cVwM      = input.color(#7a3db8, "Màu VWAP tháng", group = G4)
+
+string G5 = "Volume profile"
+bool   showVP  = input.bool(true, "Hiện volume profile / show", group = G5)
+string vpMode  = input.string("Vùng nhìn thấy", "Phạm vi / range", options = ["Vùng nhìn thấy", "Số nến"], group = G5)
+int    vpBars  = input.int(200, "Số nến (khi chọn Số nến)", minval = 20, maxval = 4000, group = G5)
+int    vpRows  = input.int(40, "Số hàng / rows", minval = 10, maxval = 100, group = G5)
+int    vpWidth = input.int(40, "Độ rộng tối đa (nến) / max width (bars)", minval = 10, maxval = 200, group = G5)
+float  vpVaPct = input.float(70, "Vùng giá trị % / value area", minval = 50, maxval = 95, group = G5)
+color  cPoc    = input.color(#e08a00, "Màu POC", group = G5)
+
+// ───────────────────────────── Helpers
+L(string vi, string en) =>
+    lang == "VI" ? vi : en
+
+fmt(float x) =>
+    str.tostring(x, format.mintick)
+
+// ───────────────────────────── Base series (SPEC §6)
+float v = nz(volume)
+var int volBars = 0
+volBars += v > 0 ? 1 : 0
+bool  hasVol  = volBars > (bar_index + 1) * 0.6
+float smaV    = ta.sma(v, volLen)
+float rvol    = hasVol and smaV > 0 ? v / smaV : 1.0
+float atrV    = ta.atr(atrLen)
+float a       = atrV > 0 ? atrV : syminfo.mintick
+float spread  = (high - low) / a
+float ema20   = ta.ema(close, 20)
+float ema50   = ta.ema(close, 50)
+float slope50 = ema50 - ema50[10]
+float lin20   = ta.linreg(close, 20, 0)
+float sd20    = ta.stdev(close, 20)
+float smaV5   = ta.sma(v, 5)
+float smaV10  = ta.sma(v, 10)
+float smaV50  = ta.sma(v, 50)
+float smaRv5  = ta.sma(rvol, 5)
+float hh50    = ta.highest(high, 50)
+float ll50    = ta.lowest(low, 50)
+float pos50   = hh50 > ll50 ? (close - ll50) / (hh50 - ll50) : 0.5
+float cumV    = ta.cum(v)
+float hhR     = ta.highest(high, rangeLen)
+float llR     = ta.lowest(low, rangeLen)
+float phv     = ta.pivothigh(high, pivL, pivR)
+float plv     = ta.pivotlow(low, pivL, pivR)
+int   warm    = math.max(volLen, 50)
+
+cumAt(int idx) =>
+    idx < 0 ? 0.0 : cumV[bar_index - idx]
+
+// Average volume per bar of the bars after `ia` up to and including `ib`.
+avgVol(int ia, int ib) =>
+    ib > ia ? (cumAt(ib) - cumAt(ia)) / (ib - ia) : v
+
+// ───────────────────────────── Event registry (SPEC §7)
+var map<string, int> seen = map.new<string, int>()
+var array<string> fired = array.new<string>()
+fired.clear()
+
+coolOf(string code) =>
+    switch code
+        "NS"       => 5
+        "ND"       => 5
+        "UT"       => 5
+        "SPRING"   => 5
+        "SC"       => 5
+        "BC"       => 5
+        "TRI"      => 15
+        "PARA_UP"  => 15
+        "TL_DN"    => 10
+        "TL_UP"    => 10
+        "HARM_UP"  => 8
+        "HARM_DN"  => 8
+        "SHIFT_UP" => 8
+        "DT"       => 10
+        "DB"       => 10
+        "HS"       => 10
+        "IHS"      => 10
+        "DIV_TOP"  => 5
+        "DIV_BOT"  => 5
+        => 3
+
+labelOf(string code) =>
+    switch code
+        "SC"         => "SC"
+        "BC"         => "BC"
+        "SPRING"     => "SPR"
+        "UT"         => "UT"
+        "SOS"        => "SOS"
+        "SOW"        => "SOW"
+        "LPS"        => "LPS"
+        "LPSY"       => "LPSY"
+        "DIV_TOP"    => "DIV"
+        "DIV_BOT"    => "TEST"
+        "HS"         => "H&S"
+        "IHS"        => "iH&S"
+        "DT"         => "2T"
+        "DB"         => "2B"
+        "NECK_DN"    => "NECK"
+        "NECK_UP"    => "NECK"
+        "BO_UP_WEAK" => "BO?"
+        "BO_DN_WEAK" => "BO?"
+        "ABS_LO"     => "ABS"
+        "ABS_HI"     => "ABS"
+        "NS"         => "NS"
+        "ND"         => "ND"
+        "PARA_UP"    => "PARA"
+        "TL_DN"      => "TL"
+        "TL_UP"      => "TL"
+        => ""
+
+descOf(string code) =>
+    switch code
+        "SC"         => L("Cao trào bán: volume cực lớn, biên độ rộng ở đáy mới", "Selling climax: huge volume, wide bar at a new low")
+        "BC"         => L("Cao trào mua: volume cực lớn, biên độ rộng ở đỉnh mới", "Buying climax: huge volume, wide bar at a new high")
+        "ABS_LO"     => L("Hấp thụ ở vùng thấp: nỗ lực lớn, kết quả nhỏ", "Absorption low: big effort, small result")
+        "ABS_HI"     => L("Hấp thụ ở vùng cao: nỗ lực lớn, kết quả nhỏ", "Absorption high: big effort, small result")
+        "NS"         => L("Không còn cung: nến giảm hẹp, volume cạn", "No supply: narrow down bar on dry volume")
+        "ND"         => L("Không còn cầu: nến tăng hẹp, volume cạn", "No demand: narrow up bar on dry volume")
+        "DIV_TOP"    => L("Phân kỳ đỉnh: đỉnh cao hơn nhưng sóng tăng yếu hơn", "Top divergence: higher high on a weaker up-wave")
+        "DIV_BOT"    => L("Test đáy: sóng giảm yếu hơn", "Bottom test: weaker down-wave")
+        "SOS"        => L("SOS: phá đỉnh vùng kèm volume lớn", "SOS: range breakout on high volume")
+        "SOW"        => L("SOW: thủng đáy vùng kèm volume lớn", "SOW: range breakdown on high volume")
+        "BO_UP_WEAK" => L("Phá đỉnh vùng nhưng volume thấp", "Upside break on low volume")
+        "BO_DN_WEAK" => L("Thủng đáy vùng nhưng volume thấp", "Downside break on low volume")
+        "UT"         => L("Upthrust: vượt đỉnh vùng rồi đóng cửa quay lại", "Upthrust: poked above the range and closed back in")
+        "SPRING"     => L("Spring: thủng đáy vùng rồi đóng cửa quay lại", "Spring: dipped below the range and closed back in")
+        "LPS"        => L("LPS: test lại đỉnh vùng cũ với volume thấp", "LPS: low-volume retest of the old range top")
+        "LPSY"       => L("LPSY: hồi test đáy vùng cũ với volume thấp", "LPSY: low-volume retest of the old range bottom")
+        "PARA_UP"    => L("Tăng parabol, volume dồn dập", "Parabolic advance on heavy volume")
+        "TL_DN"      => L("Gãy xu hướng tăng kèm volume", "Uptrend line broken on volume")
+        "TL_UP"      => L("Gãy xu hướng giảm kèm volume", "Downtrend line broken on volume")
+        "DT"         => L("Hai đỉnh, đỉnh sau volume thấp hơn", "Double top, lighter second peak")
+        "DB"         => L("Hai đáy, đáy sau volume thấp hơn", "Double bottom, lighter retest")
+        "HS"         => L("Vai–đầu–vai, vai phải volume thấp", "Head and shoulders, light right shoulder")
+        "IHS"        => L("Vai–đầu–vai đảo ngược", "Inverse head and shoulders")
+        "NECK_DN"    => L("Thủng đường viền cổ kèm volume", "Neckline broken down on volume")
+        "NECK_UP"    => L("Vượt đường viền cổ kèm volume", "Neckline broken up on volume")
+        => code
+
+emit(string code, int dir, int atBar) =>
+    bool ok = true
+    if seen.contains(code)
+        ok := bar_index - seen.get(code) >= coolOf(code)
+    if ok
+        seen.put(code, bar_index)
+        fired.push(code)
+        string lbl = labelOf(code)
+        bool minor = code == "NS" or code == "ND" or code == "ABS_LO" or code == "ABS_HI"
+        if showEvents and lbl != "" and (not minor or showMinor)
+            int off = bar_index - atBar
+            label.new(x = atBar, y = dir == 1 ? low[off] : high[off], text = lbl, xloc = xloc.bar_index, yloc = dir == 1 ? yloc.belowbar : yloc.abovebar, color = color.new(color.white, 100), style = dir == 1 ? label.style_label_up : label.style_label_down, textcolor = dir == 1 ? cUp : dir == -1 ? cDn : color.gray, size = size.small, tooltip = descOf(code))
+    ok
+
+setState(string code) =>
+    seen.put(code, bar_index)
+    true
+
+ago(string code) =>
+    seen.contains(code) ? bar_index - seen.get(code) : 100000
+
+seenNow(string code) =>
+    seen.contains(code) and seen.get(code) == bar_index
+
+// ───────────────────────────── Range box (SPEC §7, RANGE / SOS / SOW / UT / SPRING / LPS / LPSY)
+type RBox
+    bool   exists   = false
+    int    start    = 0
+    int    stop     = 0
+    float  top      = 0.0
+    float  bot      = 0.0
+    int    prior    = 0
+    int    broken   = 0
+    int    brokenAt = -1
+    bool   strong   = false
+    string kind     = "range"
+    box    drawn    = na
+
+var RBox bx = RBox.new()
+
+priorTrend(int start) =>
+    int off = bar_index - start
+    float d = (close[off] - close[off + rangeLen]) / nz(atrV[off], a)
+    d < -2 ? -1 : d > 2 ? 1 : 0
+
+startBox(RBox b, int start, float top, float bot, string kind) =>
+    b.exists   := true
+    b.start    := start
+    b.stop     := bar_index
+    b.top      := top
+    b.bot      := bot
+    b.prior    := priorTrend(start)
+    b.broken   := 0
+    b.brokenAt := -1
+    b.strong   := false
+    b.kind     := kind
+    if showBoxes
+        color tint = b.prior == -1 ? cUp : b.prior == 1 ? cDn : cVwW
+        b.drawn := box.new(left = start, top = top, right = bar_index, bottom = bot, border_color = color.new(tint, 50), border_style = line.style_dashed, bgcolor = color.new(tint, 93))
+    true
+
+// Necklines waiting for a break (DT / DB / HS / IHS)
+var array<int>    nkDir  = array.new<int>()
+var array<float>  nkLvl  = array.new<float>()
+var array<float>  nkHead = array.new<float>()
+var array<int>    nkExp  = array.new<int>()
+var array<string> nkFrom = array.new<string>()
+
+addNeck(int dir, float lvl, float head, string src) =>
+    nkDir.push(dir)
+    nkLvl.push(lvl)
+    nkHead.push(head)
+    nkExp.push(bar_index + 40)
+    nkFrom.push(src)
+    true
+
+// ───────────────────────────── Zigzag of confirmed pivots
+var array<int>   zI = array.new<int>()
+var array<float> zP = array.new<float>()
+var array<int>   zT = array.new<int>()
+
+addPivot(int t, float price, int idx) =>
+    bool changed = false
+    int n = zT.size()
+    if n > 0 and zT.get(n - 1) == t
+        float lp = zP.get(n - 1)
+        if (t == 1 and price > lp) or (t == -1 and price < lp)
+            zI.set(n - 1, idx)
+            zP.set(n - 1, price)
+            changed := true
+    else
+        zI.push(idx)
+        zP.push(price)
+        zT.push(t)
+        if zT.size() > 40
+            zI.shift()
+            zP.shift()
+            zT.shift()
+        changed := true
+    changed
+
+harmony(bool up, bool down, float upV, float dnV) =>
+    if hasVol
+        if up and upV > 1.3 * dnV
+            emit("HARM_UP", 1, bar_index)
+        if down and dnV > 1.3 * upV
+            emit("HARM_DN", -1, bar_index)
+        if down and upV > 1.3 * dnV
+            emit("SHIFT_UP", 1, bar_index)
+    true
+
+triangle(RBox b, bool converging, float top, float bot, int start) =>
+    if converging and (not hasVol or smaV10 / smaV50 < 0.85)
+        emit("TRI", 0, bar_index)
+        if not b.exists or b.broken != 0
+            startBox(b, start, top, bot, "tri")
+    true
+
+evalPivot(RBox b) =>
+    int k = zT.size() - 1
+    if k >= 3
+        float aa = nz(atrV[bar_index - zI.get(k)], a)
+        if zT.get(k) == 1
+            float hn = zP.get(k)
+            float ln = zP.get(k - 1)
+            float hp = zP.get(k - 2)
+            float lp = zP.get(k - 3)
+            float upNew  = avgVol(zI.get(k - 1), zI.get(k))
+            float upPrev = avgVol(zI.get(k - 3), zI.get(k - 2))
+            float dnLast = avgVol(zI.get(k - 2), zI.get(k - 1))
+            if hasVol and hn > hp and upNew < 0.85 * upPrev
+                emit("DIV_TOP", -1, zI.get(k))
+            if math.abs(hn - hp) <= 0.5 * aa and (not hasVol or upNew < upPrev) and emit("DT", -1, zI.get(k))
+                addNeck(-1, ln, math.max(hn, hp), "DT")
+            if k >= 5
+                float hpp = zP.get(k - 4)
+                float leftVol = avgVol(zI.get(k - 5), zI.get(k - 4))
+                if hp > hpp and hp > hn and math.abs(hpp - hn) <= aa and (not hasVol or upNew < leftVol) and emit("HS", -1, zI.get(k))
+                    addNeck(-1, (lp + ln) / 2, hp, "HS")
+            harmony(hn > hp and ln > lp, hn < hp and ln < lp, upNew, dnLast)
+            triangle(b, hn < hp and ln > lp and hn - ln <= 0.75 * (hp - lp), hn, ln, zI.get(k - 2))
+        else
+            float ln = zP.get(k)
+            float hn = zP.get(k - 1)
+            float lp = zP.get(k - 2)
+            float hp = zP.get(k - 3)
+            float dnNew  = avgVol(zI.get(k - 1), zI.get(k))
+            float dnPrev = avgVol(zI.get(k - 3), zI.get(k - 2))
+            float upLast = avgVol(zI.get(k - 2), zI.get(k - 1))
+            if hasVol and ln <= lp + 0.3 * aa and dnNew < 0.85 * dnPrev
+                emit("DIV_BOT", 1, zI.get(k))
+            if math.abs(ln - lp) <= 0.5 * aa and (not hasVol or dnNew < dnPrev) and emit("DB", 1, zI.get(k))
+                addNeck(1, hn, math.min(ln, lp), "DB")
+            if k >= 5
+                float lpp = zP.get(k - 4)
+                float leftVol = avgVol(zI.get(k - 5), zI.get(k - 4))
+                if lp < lpp and lp < ln and math.abs(lpp - ln) <= aa and (not hasVol or dnNew < leftVol) and emit("IHS", 1, zI.get(k))
+                    addNeck(1, (hp + hn) / 2, lp, "IHS")
+            harmony(ln > lp and hn > hp, ln < lp and hn < hp, upLast, dnNew)
+            triangle(b, hn < hp and ln > lp and hn - ln <= 0.75 * (hp - lp), hn, ln, zI.get(k - 3))
+    true
+
+// Pivots confirmed this bar, the one that alternates with the zigzag first.
+int pIdx = bar_index - pivR
+bool isPH = not na(phv)
+bool isPL = not na(plv)
+bool lowFirst = zT.size() > 0 and zT.get(zT.size() - 1) == 1
+if lowFirst
+    if isPL and addPivot(-1, plv, pIdx) and bar_index >= warm
+        evalPivot(bx)
+    if isPH and addPivot(1, phv, pIdx) and bar_index >= warm
+        evalPivot(bx)
+else
+    if isPH and addPivot(1, phv, pIdx) and bar_index >= warm
+        evalPivot(bx)
+    if isPL and addPivot(-1, plv, pIdx) and bar_index >= warm
+        evalPivot(bx)
+
+// ───────────────────────────── Per-bar events
+var bool prevPara = false
+var bool prevTlDn = false
+var bool prevTlUp = false
+if bar_index >= warm and hasVol
+    bool downTrend = close < ema50 or slope50 < 0
+    bool upTrend = close > ema50 or slope50 > 0
+    float move30 = (close - close[30]) / a
+    bool breakingOut = bx.exists and bx.broken == 0 and (close > bx.top or close < bx.bot)
+    if rvol >= kUltra and spread >= kWide and low <= ll50 and downTrend and move30 < -3 and not breakingOut
+        emit("SC", 1, bar_index)
+    if rvol >= kUltra and spread >= kWide and high >= hh50 and upTrend and move30 > 3 and not breakingOut
+        emit("BC", -1, bar_index)
+    if rvol >= kHi and spread <= kNarrow and pos50 <= 0.33
+        emit("ABS_LO", 1, bar_index)
+    if rvol >= kHi and spread <= kNarrow and pos50 >= 0.67
+        emit("ABS_HI", -1, bar_index)
+    bool quiet = rvol < 0.6 and spread < kNarrow and v < v[1] and v < v[2]
+    if quiet and close < close[1] and close < close[5] and pos50 <= 0.5
+        emit("NS", 1, bar_index)
+    if quiet and close > close[1] and close > close[5] and pos50 >= 0.5
+        emit("ND", -1, bar_index)
+    float s5 = ema20 - ema20[5]
+    float s5p = ema20[10] - ema20[15]
+    bool para = close > ema20 and s5p > 0 and s5 > 2 * s5p and high >= hh50 and smaRv5 > 1.5
+    if para and not prevPara
+        emit("PARA_UP", -1, bar_index)
+    prevPara := para
+    bool tlDn = slope50 > 0 and close < lin20 - 1.5 * sd20 and rvol >= kHi
+    bool tlUp = slope50 < 0 and close > lin20 + 1.5 * sd20 and rvol >= kHi
+    if tlDn and not prevTlDn
+        emit("TL_DN", -1, bar_index)
+    if tlUp and not prevTlUp
+        emit("TL_UP", 1, bar_index)
+    prevTlDn := tlDn
+    prevTlUp := tlUp
+
+// Necklines
+var string tFrom = ""
+var float tT1 = na
+if bar_index >= warm and nkDir.size() > 0
+    for j = nkDir.size() - 1 to 0
+        int   d    = nkDir.get(j)
+        float lvl  = nkLvl.get(j)
+        float head = nkHead.get(j)
+        bool  volOk = not hasVol or rvol >= kHi
+        bool  drop = false
+        if d == -1 and close < lvl and volOk
+            emit("NECK_DN", -1, bar_index)
+            tFrom := nkFrom.get(j)
+            tT1 := lvl - (head - lvl)
+            drop := true
+        else if d == 1 and close > lvl and volOk
+            emit("NECK_UP", 1, bar_index)
+            tFrom := nkFrom.get(j)
+            tT1 := lvl + (lvl - head)
+            drop := true
+        else if bar_index > nkExp.get(j) or (d == -1 and close > head) or (d == 1 and close < head)
+            drop := true
+        if drop
+            nkDir.remove(j)
+            nkLvl.remove(j)
+            nkHead.remove(j)
+            nkExp.remove(j)
+            nkFrom.remove(j)
+
+// Box: breakouts, failed breakouts, tests
+var int lastLps = -99
+var int lastLpsy = -99
+var float springLow = na
+var float utHigh = na
+if bar_index >= warm
+    if bx.exists and bx.broken == 0
+        if close > bx.top
+            bx.broken := 1
+            bx.brokenAt := bar_index
+            bx.strong := hasVol and rvol >= kHi
+            if bx.strong
+                emit("SOS", 1, bar_index)
+            else if hasVol and rvol < 1
+                emit("BO_UP_WEAK", 0, bar_index)
+        else if close < bx.bot
+            bx.broken := -1
+            bx.brokenAt := bar_index
+            bx.strong := hasVol and rvol >= kHi
+            if bx.strong
+                emit("SOW", -1, bar_index)
+            else if hasVol and rvol < 1
+                emit("BO_DN_WEAK", 0, bar_index)
+        else
+            bx.stop := bar_index
+            if not na(bx.drawn)
+                bx.drawn.set_right(bar_index)
+            if bx.kind == "range" and bar_index - bx.start >= 10
+                if high > bx.top + 0.2 * a and close < bx.top and emit("UT", -1, bar_index)
+                    utHigh := high
+                if low < bx.bot - 0.2 * a and close > bx.bot and emit("SPRING", 1, bar_index)
+                    springLow := low
+    else if bx.exists and bx.broken != 0
+        int since = bar_index - bx.brokenAt
+        if since > 0 and since <= 5 and bx.broken == 1 and close < bx.top
+            if emit("UT", -1, bar_index)
+                utHigh := high
+            bx.broken := 0
+            bx.stop := bar_index
+            bx.strong := false
+        else if since > 0 and since <= 5 and bx.broken == -1 and close > bx.bot
+            if emit("SPRING", 1, bar_index)
+                springLow := low
+            bx.broken := 0
+            bx.stop := bar_index
+            bx.strong := false
+        else if since > 0 and since <= 20 and bx.strong
+            bool quietTest = not hasVol or rvol <= 0.85
+            if bx.broken == 1 and math.abs(low - bx.top) <= 0.5 * a and quietTest and close > bx.top and bar_index - lastLps >= 3
+                emit("LPS", 1, bar_index)
+                lastLps := bar_index
+            if bx.broken == -1 and math.abs(high - bx.bot) <= 0.5 * a and quietTest and close < bx.bot and bar_index - lastLpsy >= 3
+                emit("LPSY", -1, bar_index)
+                lastLpsy := bar_index
+
+    // A new range; it starts at the latest climax inside the window (Wyckoff phase A).
+    if bar_index >= rangeLen
+        bool inRange = (hhR - llR) / a <= rangeAtr
+        bool free = not bx.exists or (bx.broken != 0 and (bar_index - bx.brokenAt) * 2 >= rangeLen)
+        if inRange and free
+            int start = bar_index - rangeLen + 1
+            float top = hhR
+            float bot = llR
+            int climax = -1
+            if seen.contains("SC") and seen.get("SC") >= start
+                climax := seen.get("SC")
+            if seen.contains("BC") and seen.get("BC") >= start
+                climax := math.max(climax, seen.get("BC"))
+            if climax >= 0 and bar_index - climax >= 5
+                float t2 = high
+                float b2 = low
+                for k = 0 to bar_index - climax
+                    t2 := math.max(t2, high[k])
+                    b2 := math.min(b2, low[k])
+                if (t2 - b2) / a <= rangeAtr * 1.25
+                    start := climax
+                    top := t2
+                    bot := b2
+            startBox(bx, start, top, bot, "range")
+
+    // States of the active box
+    if bx.exists and bx.broken == 0
+        setState("RANGE")
+        if bx.prior == -1
+            setState("RANGE_ACC")
+        if bx.prior == 1
+            setState("RANGE_DIST")
+        float width = bx.top - bx.bot
+        if hasVol and smaV10 / smaV50 < 0.75
+            setState("SQZ")
+        if width / a <= 3 and close > ema50 and slope50 > 0
+            setState("FLAT_BASE")
+        if bx.prior == 1 and close >= bx.top - 0.25 * width and bar_index - bx.start >= 15 and (not hasVol or smaV5 < smaV)
+            setState("CUP")
+    if bx.exists and hasVol and (bx.broken == 0 or bar_index - bx.brokenAt <= 5) and bar_index - bx.start >= 20
+        int third = int(math.floor((bar_index - bx.start + 1) / 3.0))
+        float m1 = avgVol(bx.start - 1, bx.start + third - 1)
+        float m2 = avgVol(bx.start + third - 1, bx.start + 2 * third - 1)
+        float m3 = avgVol(bx.start + 2 * third - 1, bar_index)
+        bool ushape = m2 < 0.8 * m1 and m2 < 0.8 * m3
+        float mid = (bx.top + bx.bot) / 2
+        if ushape and bx.prior == -1 and close > mid
+            setState("ROUND_BOT")
+        if ushape and bx.prior == 1 and close < mid
+            setState("ROUND_TOP")
+
+// ───────────────────────────── VWAP and auto-anchored VWAP (SPEC §7.6)
+bool intraday = timeframe.in_seconds() < 86400
+bool belowWeek = timeframe.in_seconds() < 604800
+bool belowMonth = not timeframe.ismonthly
+[vwD, vwDu1, vwDl1] = ta.vwap(hlc3, timeframe.change("D"), 1.0)
+[vwD2, vwDu2, vwDl2] = ta.vwap(hlc3, timeframe.change("D"), 2.0)
+[vwW, vwWu, vwWl] = ta.vwap(hlc3, timeframe.change("W"), 1.0)
+[vwM, vwMu, vwMl] = ta.vwap(hlc3, timeframe.change("M"), 1.0)
+bool newDay = timeframe.change("D")
+plot(showVwapD and intraday and not newDay ? vwD : na, "VWAP phiên", cVwD, 2, plot.style_linebr)
+plot(showVwapD and showBands and intraday and not newDay ? vwDu1 : na, "VWAP +1σ", color.new(cVwD, 50), 1, plot.style_linebr)
+plot(showVwapD and showBands and intraday and not newDay ? vwDl1 : na, "VWAP −1σ", color.new(cVwD, 50), 1, plot.style_linebr)
+plot(showVwapD and showBands and intraday and not newDay ? vwDu2 : na, "VWAP +2σ", color.new(cVwD, 70), 1, plot.style_linebr)
+plot(showVwapD and showBands and intraday and not newDay ? vwDl2 : na, "VWAP −2σ", color.new(cVwD, 70), 1, plot.style_linebr)
+plot(showVwapW and belowWeek and not timeframe.change("W") ? vwW : na, "VWAP tuần", cVwW, 2, plot.style_linebr)
+plot(showVwapM and belowMonth and not timeframe.change("M") ? vwM : na, "VWAP tháng", cVwM, 2, plot.style_linebr)
+
+var int bullAnchor = na
+var int bearAnchor = na
+if seenNow("SC") or seenNow("SPRING") or seenNow("SOS")
+    bullAnchor := bar_index
+if seenNow("BC") or seenNow("UT") or seenNow("SOW")
+    bearAnchor := bar_index
+float wv = math.max(v, 1e-9)
+var float bPV = 0.0
+var float bV = 0.0
+var float sPV = 0.0
+var float sV = 0.0
+if not na(bullAnchor) and bar_index == bullAnchor
+    bPV := 0.0
+    bV := 0.0
+if not na(bearAnchor) and bar_index == bearAnchor
+    sPV := 0.0
+    sV := 0.0
+if not na(bullAnchor)
+    bPV += hlc3 * wv
+    bV += wv
+if not na(bearAnchor)
+    sPV += hlc3 * wv
+    sV += wv
+float avBull = na(bullAnchor) ? na : bPV / bV
+float avBear = na(bearAnchor) ? na : sPV / sV
+plot(showAvwap ? avBull : na, "AVWAP ▲", color.new(cUp, 10), 1, plot.style_linebr)
+plot(showAvwap ? avBear : na, "AVWAP ▼", color.new(cDn, 10), 1, plot.style_linebr)
+
+// ───────────────────────────── Volume profile on the last bar (SPEC §7.7)
+var array<box> vpBoxes = array.new<box>()
+var line pocLine = na
+var float pocPrice = na
+if barstate.islast and hasVol
+    for bb in vpBoxes
+        bb.delete()
+    vpBoxes.clear()
+    pocLine.delete()
+    int n = 0
+    if vpMode == "Số nến"
+        n := math.min(vpBars, bar_index + 1)
+    else
+        for k = 0 to math.min(bar_index, 4000)
+            if time[k] < chart.left_visible_bar_time
+                break
+            n += 1
+    if n > 1
+        float lo = low
+        float hi = high
+        for k = 0 to n - 1
+            lo := math.min(lo, low[k])
+            hi := math.max(hi, high[k])
+        if hi > lo
+            float step = (hi - lo) / vpRows
+            array<float> rows = array.new<float>(vpRows, 0.0)
+            for k = 0 to n - 1
+                int r0 = math.min(vpRows - 1, int(math.floor((low[k] - lo) / step)))
+                int r1 = math.min(vpRows - 1, int(math.floor((high[k] - lo) / step)))
+                float share = v[k] / (r1 - r0 + 1)
+                for r = r0 to r1
+                    rows.set(r, rows.get(r) + share)
+            float mx = rows.max()
+            int poc = rows.indexof(mx)
+            float total = rows.sum()
+            float inVa = rows.get(poc)
+            int up = poc
+            int dn = poc
+            while inVa < total * vpVaPct / 100 and (up < vpRows - 1 or dn > 0)
+                float nu = up < vpRows - 1 ? rows.get(up + 1) : -1.0
+                float nd = dn > 0 ? rows.get(dn - 1) : -1.0
+                if nu >= nd
+                    up += 1
+                    inVa += nu
+                else
+                    dn -= 1
+                    inVa += nd
+            pocPrice := lo + (poc + 0.5) * step
+            if showVP and mx > 0
+                int left = bar_index + 3
+                for r = 0 to vpRows - 1
+                    int w = int(math.round(rows.get(r) / mx * vpWidth))
+                    color col = r == poc ? color.new(cPoc, 25) : r >= dn and r <= up ? color.new(cVwW, 70) : color.new(color.gray, 80)
+                    vpBoxes.push(box.new(left = left, top = lo + (r + 1) * step, right = left + math.max(w, 1), bottom = lo + r * step, border_color = color.new(color.white, 100), bgcolor = col))
+                pocLine := line.new(bar_index - n + 1, pocPrice, left, pocPrice, color = cPoc, style = line.style_dotted, width = 1)
+
+// ───────────────────────────── Pattern scoring (SPEC §7.2)
+var array<int> pId = array.from(1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 11, 12, 13, 14, 14, 15, 16, 17, 17, 18, 19, 19, 21, 22, 23, 24, 25, 27, 27, 29, 30, 31)
+var array<int> pDir = array.from(1, 1, 1, -1, -1, -1, 1, -1, -1, 1, 1, -1, 1, -1, 1, 1, -1, -1, 1, -1, 1, -1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, -1, 1)
+var array<string> pSig = array.from(
+     "FLAT_BASE:0.5,SOS:0.5", "SHIFT_UP:0.6,DIV_BOT:0.4", "HARM_UP:0.7,NS:0.3", "DIV_TOP:1", "HARM_DN:0.5,ND:0.5",
+     "HARM_DN:0.6,SOW:0.4", "HARM_UP:1", "HARM_DN:1", "PARA_UP:0.6,BC:0.4", "SC:0.6,ABS_LO:0.2,NS:0.2",
+     "DB:0.6,SC:0.2,DIV_BOT:0.2", "TL_DN:1", "TL_UP:1", "ABS_HI:0.5,RANGE_DIST:0.3,BC:0.2", "ABS_LO:0.4,RANGE_ACC:0.4,SC:0.2",
+     "SQZ:0.5,SOS:0.5", "SQZ:0.5,SOW:0.5", "DIV_TOP:0.5,ND:0.5", "SQZ:0.4,SOS:0.6", "BO_UP_WEAK:0.4,UT:0.6",
+     "BO_DN_WEAK:0.4,SPRING:0.6", "SOW:1", "LPSY:0.7,SOW:0.3", "LPS:0.7,SOS:0.3", "HS:1",
+     "HS:0.4,NECK_DN:0.6", "IHS:0.5,NECK_UP:0.5", "DT:0.6,NECK_DN:0.4", "DB:0.6,NECK_UP:0.4", "TRI:0.5,SOS:0.5",
+     "TRI:0.5,SOW:0.5", "ROUND_BOT:1", "ROUND_TOP:1", "CUP:0.6,SOS:0.4")
+
+patName(int id) =>
+    switch id
+        1  => L("Nền phẳng, phá vỡ kèm volume", "Flat base breakout on volume")
+        2  => L("Xu hướng giảm suy yếu, volume đổi chiều", "Weakening downtrend, volume shifts")
+        3  => L("Volume thuận xu hướng (xem khung lớn)", "Volume follows the trend (check HTF)")
+        4  => L("Đỉnh cao dần, volume giảm dần", "Higher peaks on falling volume")
+        5  => L("Hồi lên trong xu hướng giảm, volume giảm", "Rally in a downtrend on falling volume")
+        6  => L("Giảm mạnh kèm volume tăng", "Sharp decline on rising volume")
+        7  => L("Quy tắc đồng biến", "Volume goes with the trend")
+        8  => L("Tăng parabol, volume dốc đứng", "Parabolic blow-off")
+        9  => L("Cao trào bán", "Selling climax")
+        10 => L("Hai đáy, đáy sau volume thấp", "Double bottom, lighter retest")
+        11 => L("Gãy trendline kèm volume", "Trendline break on volume")
+        12 => L("Phân phối ở đỉnh", "Distribution at the top")
+        13 => L("Tích lũy ở đáy", "Accumulation at the bottom")
+        14 => L("Nghỉ (volume cạn) rồi bứt phá", "Rest on dry volume, then a sharp move")
+        15 => L("Lập đỉnh, volume suy giảm", "New high on fading volume")
+        16 => L("Sideway hẹp, phá lên kèm volume", "Tight range, upside breakout on volume")
+        17 => L("Phá vỡ giả (volume giảm)", "False breakout on shrinking volume")
+        18 => L("Phá vỡ xuống thật", "True breakdown on volume")
+        19 => L("Hồi test vùng phá vỡ, volume giảm", "Low-volume retest of the breakout")
+        21 => L("Vai–đầu–vai đỉnh", "Head and shoulders top")
+        22 => L("Mục tiêu vai–đầu–vai", "Head and shoulders target")
+        23 => L("Vai–đầu–vai đảo ngược", "Inverse head and shoulders")
+        24 => L("Hai đỉnh, đỉnh sau volume thấp", "Double top, lighter second peak")
+        25 => L("Hai đáy", "Double bottom")
+        27 => L("Tam giác, phá trendline", "Triangle breakout")
+        29 => L("Đáy tròn", "Rounding bottom")
+        30 => L("Đỉnh tròn", "Rounding top")
+        31 => L("Cốc – tay cầm", "Cup with handle")
+        => ""
+
+fresh(string code) =>
+    float f = 0.0
+    if seen.contains(code)
+        int bs = bar_index - seen.get(code)
+        f := bs <= 3 ? 1.0 : math.max(0.0, 1.0 - (bs - 3) / (decay - 3.0))
+    f
+
+// ───────────────────────────── Context table (SPEC §7.8)
+tablePos() =>
+    switch tablePosIn
+        "Trên trái" => position.top_left
+        "Dưới phải" => position.bottom_right
+        "Dưới trái" => position.bottom_left
+        => position.top_right
+
+var table tb = table.new(tablePos(), 2, 9, bgcolor = color.new(color.white, 0), border_color = color.new(#d9d9d6, 0), border_width = 1, frame_color = color.new(#111111, 0), frame_width = 1)
+
+row(int r, string k, string val, color tc) =>
+    tb.cell(0, r, k, text_color = color.new(#6b6b6b, 0), text_size = size.small, text_halign = text.align_left)
+    tb.cell(1, r, val, text_color = tc, text_size = size.small, text_halign = text.align_left)
+    true
+
+if barstate.islast and showTable
+    // Supply – demand
+    int sd = 0
+    sd += close > vwD ? 1 : -1
+    sd += close > vwW ? 1 : -1
+    sd += vwW > vwW[5] ? 1 : vwW < vwW[5] ? -1 : 0
+    if not na(pocPrice)
+        sd += close > pocPrice ? 1 : -1
+    string sdTxt = sd >= 2 ? L("Cầu kiểm soát", "Demand in control") : sd <= -2 ? L("Cung kiểm soát", "Supply in control") : L("Cân bằng", "Balanced")
+    sdTxt += L(" · VWAP tuần ", " · weekly VWAP ") + fmt(vwW) + " · POC " + (na(pocPrice) ? "—" : fmt(pocPrice))
+
+    // Effort – result
+    string er = ""
+    if not hasVol
+        er := L("Không có volume: chỉ chạy luật về giá", "No volume: price-only rules")
+    else if rvol >= kHi and spread >= kWide
+        er := L("Đồng thuận: nỗ lực lớn, kết quả lớn", "Harmony: big effort, big result")
+    else if rvol >= kHi and spread <= kNarrow
+        er := L("Hấp thụ: nỗ lực lớn, kết quả nhỏ", "Absorption: big effort, small result")
+    else if rvol <= kLo and spread >= kWide
+        er := L("Đi dễ: nỗ lực nhỏ, kết quả lớn", "Ease of movement: small effort, big result")
+    else if rvol <= kLo and spread <= kNarrow
+        er := L("Nghỉ / test: nỗ lực nhỏ, kết quả nhỏ", "Rest / test: small effort, small result")
+    else
+        er := L("Bình thường", "Normal")
+    if hasVol
+        er += " (RVOL " + str.tostring(rvol, "#.##") + ", " + str.tostring(spread, "#.##") + " ATR)"
+
+    // Cause – effect
+    string ce = L("Chưa có vùng sideway rõ ràng", "No clear trading range")
+    if bx.exists
+        float h = bx.top - bx.bot
+        int blen = (bx.broken == 0 ? bar_index : bx.brokenAt) - bx.start + 1
+        string kindTxt = bx.kind == "tri" ? L("Tam giác", "Triangle") : "Sideway"
+        ce := kindTxt + " " + str.tostring(blen) + L(" nến, rộng ", " bars, width ") + str.tostring(h / a, "#.#") + " ATR"
+        if bx.broken == 1
+            ce += L(" → mục tiêu ", " → targets ") + fmt(bx.top + h) + " / " + fmt(bx.top + 1.618 * h)
+        else if bx.broken == -1
+            ce += L(" → mục tiêu ", " → targets ") + fmt(bx.bot - h) + " / " + fmt(bx.bot - 1.618 * h)
+        else
+            ce += L(" → lên ", " → up ") + fmt(bx.top + h) + L(", xuống ", ", down ") + fmt(bx.bot - h)
+    if tFrom != ""
+        ce += " · " + tFrom + " " + fmt(tT1)
+
+    // Phase, scenario, invalidation
+    string volTxt = hasVol ? L(" với RVOL ≥ ", " with RVOL ≥ ") + str.tostring(kHi) : L(" (không có volume để xác nhận)", " (no volume to confirm)")
+    bool trendUp = close > ema50 and slope50 > 0
+    bool trendDn = close < ema50 and slope50 < 0
+    string phase = L("Chưa rõ cấu trúc", "No clear structure")
+    string scen = L("Đứng ngoài hoặc chờ vùng sideway hình thành", "Stand aside or wait for a range")
+    string inval = "—"
+    bool done = false
+    if bx.exists and bx.broken == 0
+        bool accum = bx.prior == -1
+        bool dist = bx.prior == 1
+        string kind = accum ? L("Tích lũy", "Accumulation") : dist ? L("Phân phối", "Distribution") : L("Sideway chưa rõ hướng", "Range, direction unclear")
+        int springAgo = ago("SPRING")
+        int utAgo = ago("UT")
+        if springAgo <= 15 and (accum or springAgo < utAgo)
+            phase := kind + L(" – pha C (Spring)", " – phase C (Spring)")
+            scen := L("Chờ SOS: đóng cửa > ", "Wait for SOS: close > ") + fmt(bx.top) + volTxt
+            inval := L("Đóng cửa < ", "Close < ") + fmt(na(springLow) ? bx.bot : springLow) + L(" (đáy Spring)", " (Spring low)")
+        else if utAgo <= 15
+            phase := kind + L(" – pha C (Upthrust)", " – phase C (Upthrust)")
+            scen := L("Chờ SOW: đóng cửa < ", "Wait for SOW: close < ") + fmt(bx.bot) + volTxt
+            inval := L("Đóng cửa > ", "Close > ") + fmt(na(utHigh) ? bx.top : utHigh) + L(" (đỉnh Upthrust)", " (Upthrust high)")
+        else
+            int climax = math.min(ago("SC"), ago("BC"))
+            int age = bar_index - bx.start
+            string ph = climax < 10 or (age < 10 and climax <= age + 10) ? "A" : "B"
+            phase := kind + L(" – pha ", " – phase ") + ph
+            scen := L("Sideway ", "Range ") + fmt(bx.bot) + " – " + fmt(bx.top) + L(": theo dõi test hai biên với volume thấp", ": watch low-volume tests of both edges")
+            inval := L("Phá vỡ kèm volume lớn sẽ xác định hướng", "A high-volume break sets the direction")
+        done := true
+    else if bx.exists and bx.broken != 0
+        int agoB = bar_index - bx.brokenAt
+        bool upBreak = bx.broken == 1
+        string kind = upBreak ? (bx.prior == -1 ? L("Tích lũy", "Accumulation") : L("Tái tích lũy", "Re-accumulation")) : (bx.prior == 1 ? L("Phân phối", "Distribution") : L("Tái phân phối", "Redistribution"))
+        float mid = (bx.top + bx.bot) / 2
+        if agoB <= 20
+            phase := kind + L(" – pha D", " – phase D") + (bx.strong ? (upBreak ? " (SOS)" : " (SOW)") : L(" (phá vỡ chưa có volume)", " (break without volume)"))
+            scen := upBreak ? L("Canh LPS: giá về ", "Look for LPS: pullback to ") + fmt(bx.top) + L(" hoặc AVWAP với volume thấp", " or AVWAP on low volume") : L("Canh LPSY: giá hồi về ", "Look for LPSY: rally to ") + fmt(bx.bot) + L(" hoặc AVWAP với volume thấp", " or AVWAP on low volume")
+            inval := (upBreak ? L("Đóng cửa < ", "Close < ") : L("Đóng cửa > ", "Close > ")) + fmt(mid) + L(" (giữa vùng)", " (range middle)")
+            done := true
+        else if (upBreak and close > ema50) or (not upBreak and close < ema50)
+            float av = upBreak ? avBull : avBear
+            phase := upBreak ? L("Pha E – xu hướng tăng (markup)", "Phase E – markup") : L("Pha E – xu hướng giảm (markdown)", "Phase E – markdown")
+            scen := upBreak ? L("Đi theo xu hướng; cảnh giác phân kỳ đỉnh và cao trào mua", "Trend-follow; watch for top divergence and buying climax") : L("Đi theo xu hướng giảm; cảnh giác test đáy và cao trào bán", "Trend-follow down; watch for bottom tests and selling climax")
+            inval := (upBreak ? L("Đóng cửa < ", "Close < ") : L("Đóng cửa > ", "Close > ")) + (na(av) ? "EMA50 " + fmt(ema50) : "AVWAP " + fmt(av))
+            done := true
+    if not done and (trendUp or trendDn)
+        phase := trendUp ? L("Xu hướng tăng (markup)", "Uptrend (markup)") : L("Xu hướng giảm (markdown)", "Downtrend (markdown)")
+        scen := trendUp ? L("Ưu tiên mua khi test lại với volume thấp", "Favor buying low-volume pullbacks") : L("Ưu tiên bán khi hồi lên với volume thấp", "Favor selling low-volume rallies")
+        inval := (trendUp ? L("Đóng cửa < EMA50 ", "Close < EMA50 ") : L("Đóng cửa > EMA50 ", "Close > EMA50 ")) + fmt(ema50)
+
+    // Closest patterns
+    array<float> best = array.new<float>(32, 0.0)
+    array<int> bestDir = array.new<int>(32, 0)
+    for j = 0 to pId.size() - 1
+        float s = 0.0
+        float tw = 0.0
+        for part in str.split(pSig.get(j), ",")
+            array<string> kv = str.split(part, ":")
+            float w = str.tonumber(kv.get(1))
+            s += w * fresh(kv.get(0))
+            tw += w
+        float sc = tw > 0 ? math.round(100 * s / tw) : 0.0
+        int id = pId.get(j)
+        if sc > best.get(id)
+            best.set(id, sc)
+            bestDir.set(id, pDir.get(j))
+    string mt = ""
+    string topName = ""
+    for t = 1 to 3
+        float m = best.max()
+        if m >= 40
+            int id = best.indexof(m)
+            mt += (mt == "" ? "" : " · ") + "#" + str.tostring(id) + (bestDir.get(id) == 1 ? "▲" : "▼") + str.tostring(m, "#")
+            if topName == ""
+                topName := patName(id)
+            best.set(id, -1)
+    if mt == ""
+        mt := L("Chưa có", "None yet")
+
+    tb.cell(0, 0, syminfo.ticker + " · " + timeframe.period, text_color = color.new(#111111, 0), text_size = size.small, text_halign = text.align_left)
+    tb.cell(1, 0, "LAI LONG · " + L("chỉ để tham khảo", "reference only"), text_color = color.new(#e08a00, 0), text_size = size.small, text_halign = text.align_left)
+    row(1, L("Cung–cầu", "Supply–demand"), sdTxt, sd >= 2 ? cUp : sd <= -2 ? cDn : color.new(#111111, 0))
+    row(2, L("Nỗ lực/KQ", "Effort/result"), er, color.new(#111111, 0))
+    row(3, L("Nhân–quả", "Cause–effect"), ce, color.new(#111111, 0))
+    row(4, L("Pha", "Phase"), phase, color.new(#111111, 0))
+    row(5, L("Mẫu gần nhất", "Patterns"), mt, color.new(#111111, 0))
+    row(6, "", topName, color.new(#6b6b6b, 0))
+    row(7, L("Kịch bản", "Scenario"), scen, color.new(#111111, 0))
+    row(8, L("Vô hiệu", "Invalidation"), inval, color.new(#111111, 0))
+
+// ───────────────────────────── Alerts (SPEC §8)
+alertcondition(seenNow("SC"), "Lai Long: SC", "{{ticker}} {{interval}}: Selling climax (SC)")
+alertcondition(seenNow("BC"), "Lai Long: BC", "{{ticker}} {{interval}}: Buying climax (BC)")
+alertcondition(seenNow("SPRING"), "Lai Long: Spring", "{{ticker}} {{interval}}: Spring")
+alertcondition(seenNow("UT"), "Lai Long: Upthrust", "{{ticker}} {{interval}}: Upthrust (UT)")
+alertcondition(seenNow("SOS"), "Lai Long: SOS", "{{ticker}} {{interval}}: Sign of strength (SOS)")
+alertcondition(seenNow("SOW"), "Lai Long: SOW", "{{ticker}} {{interval}}: Sign of weakness (SOW)")
+alertcondition(seenNow("LPS"), "Lai Long: LPS", "{{ticker}} {{interval}}: Last point of support (LPS)")
+alertcondition(seenNow("LPSY"), "Lai Long: LPSY", "{{ticker}} {{interval}}: Last point of supply (LPSY)")
+alertcondition(seenNow("DIV_TOP"), "Lai Long: phân kỳ đỉnh", "{{ticker}} {{interval}}: Top divergence")
+alertcondition(seenNow("DIV_BOT"), "Lai Long: test đáy", "{{ticker}} {{interval}}: Bottom test")
+if fired.size() > 0
+    alert(syminfo.ticker + " " + timeframe.period + " · Lai Long: " + fired.join(", "), alert.freq_once_per_bar_close)
