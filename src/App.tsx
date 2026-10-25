@@ -78,7 +78,7 @@ export function App() {
   return (
     <div className="app">
       <header className="toolbar">
-        <div className="brand"><img src="/logo-96.png" alt="" />LAI LONG VIEW</div>
+        <div className="brand" title={t('copyright', lang)}><img src="/logo-96.png" alt="" />LAI LONG VIEW</div>
         <SearchBox lang={lang} onPick={(inst, src) => patchChart(active.id, { inst, src })} />
         <div className="group tfs">
           {TIMEFRAMES.map((x) => (

@@ -46,6 +46,7 @@ const DICT = {
   },
   openChart: { vi: 'Xem chart', en: 'Open chart' },
   noVolume: { vi: 'Không có volume', en: 'No volume' },
+  copyright: { vi: '© 2026 Lai Long View. Bảo lưu mọi quyền.', en: '© 2026 Lai Long View. All rights reserved.' },
 } satisfies Record<string, Record<Lang, string>>;
 
 export type Key = keyof typeof DICT;

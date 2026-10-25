@@ -56,3 +56,7 @@ LIVE=1 npx vitest run tests/live.test.ts
 ```
 
 Chỉ để tham khảo. Điểm của mẫu hình là mức khớp luật, không phải tỉ lệ thắng.
+
+## Bản quyền
+
+© 2026 Lai Long View. Bảo lưu mọi quyền. Kho này công khai để cộng đồng xem và tham khảo; không ai được sao chép, chỉnh sửa, phân phối hay dùng lại khi chưa có sự cho phép bằng văn bản. Chi tiết trong [LICENSE](LICENSE).

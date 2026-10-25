@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "license": "UNLICENSED",
   "description": "Lai Long View — biểu đồ đa khung, volume profile, VWAP và bối cảnh Wyckoff cho trader cá nhân",
   "scripts": {
     "dev": "vite",

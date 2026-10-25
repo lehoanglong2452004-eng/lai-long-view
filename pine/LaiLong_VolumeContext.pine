@@ -1,6 +1,7 @@
 // Lai Long Volume Context — Wyckoff (cung–cầu, nhân–quả, nỗ lực–kết quả) + 31 mẫu hình khối lượng + VWAP + Volume Profile.
 // Luật phân tích: docs/SPEC.md. Giữ đồng bộ với src/engine/ của web Lai Long View.
 // Chỉ để tham khảo. Điểm mẫu hình là mức khớp luật, không phải tỉ lệ thắng.
+// © 2026 Lai Long View. Bảo lưu mọi quyền. Không sao chép, chỉnh sửa hay dùng lại khi chưa được phép.
 
 //@version=6
 indicator("Lai Long Volume Context", shorttitle = "LaiLong", overlay = true, max_labels_count = 500, max_boxes_count = 500, max_lines_count = 100, max_bars_back = 5000)

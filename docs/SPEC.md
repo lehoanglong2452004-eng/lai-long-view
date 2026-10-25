@@ -260,6 +260,7 @@ TradingView gói Free giới hạn số cảnh báo đang chạy, nên chọn s�
 
 ## 9. Bản quyền
 
+- Lai Long View: © 2026, bảo lưu mọi quyền (xem `LICENSE`). Kho công khai để cộng đồng xem; không cấp quyền sao chép hay dùng lại. Rê chuột vào logo trên thanh công cụ hiện dòng bản quyền.
 - Không dùng tên, logo, bộ icon, màu nhận diện hay bố cục sao chép của TradingView; không lấy dữ liệu và không nhúng widget của TradingView.
 - Engine vẽ chart tự viết (Canvas), không phụ thuộc thư viện chart của bên thứ ba.
 - Code Pine Script là của chủ dự án; publish (nếu có) theo House Rules của TradingView.
