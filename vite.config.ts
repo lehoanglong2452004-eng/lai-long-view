@@ -16,5 +16,6 @@ export default defineConfig({
       },
     },
   ],
-  server: { port: 5173, host: '127.0.0.1' },
+  // Dev server on its own port so it never collides with the everyday app on 5173.
+  server: { port: 5180, host: '127.0.0.1' },
 });

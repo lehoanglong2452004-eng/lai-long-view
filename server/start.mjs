@@ -1,4 +1,4 @@
-// Chạy bản đã build: `npm run build` rồi `npm start`, mở http://localhost:4173
+// Chạy bản đã build: `npm run build` rồi `npm start`, mở http://localhost:5173 (cổng của cửa sổ app Lai Long View)
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { apiMiddleware } from './api.mjs';
 
 const root = fileURLToPath(new URL('../dist/', import.meta.url));
-const port = Number(process.env.PORT || 4173);
+const port = Number(process.env.PORT || 5173);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.woff': 'font/woff', '.json': 'application/json' };
 
 createServer((req, res) => {

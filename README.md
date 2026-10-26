@@ -10,7 +10,7 @@ Biểu đồ đa khung cho trader cá nhân, đọc thị trường theo ba quy 
 
 ## Chạy web
 
-Trên Windows: bấm đúp **`Mo Lai Long View.cmd`**. File tự cài thư viện lần đầu, build bản mới nhất và mở trình duyệt ở http://localhost:4173. Giữ cửa sổ đen mở trong lúc xem; đóng cửa sổ là tắt web.
+Trên Windows: bấm đúp **`Mo Lai Long View.cmd`**. File tự cài thư viện lần đầu, build bản mới nhất và mở trình duyệt ở http://localhost:5173. Giữ cửa sổ đen mở trong lúc xem; đóng cửa sổ là tắt web.
 
 Chạy bằng lệnh (cần Node.js 20 trở lên):
 
@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-Mở http://localhost:5173
+Mở http://localhost:5180 (bản phát triển)
 
 Bản build để dùng hằng ngày:
 
@@ -28,7 +28,7 @@ npm run build
 npm start
 ```
 
-Mở http://localhost:4173
+Mở http://localhost:5173
 
 ## Dùng indicator trên TradingView
 

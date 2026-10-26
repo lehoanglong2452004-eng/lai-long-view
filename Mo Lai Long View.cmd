@@ -25,7 +25,7 @@ call npm run build >nul
 if errorlevel 1 goto fail
 
 echo.
-echo  Lai Long View dang chay tai http://localhost:4173
+echo  Lai Long View dang chay tai http://localhost:5173
 echo  Giu cua so nay mo trong luc xem chart. Dong cua so = tat Lai Long View.
 echo.
 node server\start.mjs --open
