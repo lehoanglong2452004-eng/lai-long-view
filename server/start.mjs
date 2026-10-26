@@ -1,4 +1,5 @@
 // Chạy bản đã build: `npm run build` rồi `npm start`, mở http://localhost:4173
+import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize as normPath } from 'node:path';
@@ -23,4 +24,15 @@ createServer((req, res) => {
       res.end(await readFile(join(root, 'index.html')));
     }
   });
-}).listen(port, '127.0.0.1', () => console.log(`Lai Long View: http://localhost:${port}`));
+}).listen(port, '127.0.0.1', () => {
+  const url = `http://localhost:${port}`;
+  console.log(`Lai Long View: ${url}`);
+  // `--open` (used by "Mo Lai Long View.cmd") opens the browser once the server is listening.
+  if (process.argv.includes('--open') && !process.env.LL_NO_OPEN) {
+    const [cmd, args] = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
+    spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
+  }
+}).on('error', (e) => {
+  console.error(e.code === 'EADDRINUSE' ? `Cổng ${port} đang bận: có thể Lai Long View đã chạy sẵn, mở ${`http://localhost:${port}`}` : e.message);
+  process.exit(1);
+});
