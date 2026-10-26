@@ -13,6 +13,22 @@ Biểu đồ đa khung cho trader cá nhân, đọc thị trường theo ba quy 
 
 Trên Windows: bấm đúp **`Mo Lai Long View.cmd`**. File tự cài thư viện lần đầu, build bản mới nhất và mở trình duyệt ở http://localhost:5173. Giữ cửa sổ đen mở trong lúc xem; đóng cửa sổ là tắt web.
 
+### Tự chạy cùng Windows
+
+- Bấm đúp **`Bat tu chay cung Windows.cmd`**: Lai Long View chạy ngầm (không cửa sổ) mỗi khi bật máy, nên http://localhost:5173 lúc nào cũng mở được. Bị tắt bất ngờ thì 5 giây sau tự chạy lại.
+- Bấm đúp **`Tat tu chay cung Windows.cmd`** để thôi tự chạy và dừng bản đang chạy ngầm.
+- Nhật ký chạy ngầm: `data/server.log`.
+
+### Khi web không mở được
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| "localhost refused to connect" | Lai Long View chưa chạy (chưa bật tự chạy, vừa tắt bằng file Tat…, hoặc máy chưa đăng nhập xong) | Bấm đúp `Mo Lai Long View.cmd`, hoặc bật tự chạy |
+| Mở nhầm cổng | Địa chỉ cũ `:4173` hoặc `:5180` (bản phát triển) | Dùng đúng http://localhost:5173 |
+| Một chart báo "Không tải được dữ liệu" | Mất mạng, sàn hoặc Yahoo/VNDirect lỗi, đổi cách trả dữ liệu, hoặc giới hạn số lần gọi | Chờ một lúc rồi tải lại; các chart khác vẫn chạy. Lỗi kéo dài thì chụp màn hình gửi lại |
+| Web vẫn là giao diện cũ sau khi cập nhật | Trình duyệt giữ bản cũ | Ctrl+F5 |
+| Không tự chạy nữa | Đã chuyển thư mục `E:\LaiLongView`, gỡ Node.js, hoặc ổ E: chưa sẵn sàng lúc bật máy | Bấm lại `Bat tu chay cung Windows.cmd`; xem `data/server.log` |
+
 Chạy bằng lệnh (cần Node.js 20 trở lên):
 
 ```bash

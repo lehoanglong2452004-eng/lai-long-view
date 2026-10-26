@@ -14,6 +14,12 @@ if errorlevel 1 (
   )
 )
 
+rem Lai Long View da chay ngam (tu chay cung Windows) thi chi can mo trinh duyet.
+curl.exe -s -o nul -m 2 http://127.0.0.1:5173/ && (
+  start "" http://localhost:5173
+  exit /b 0
+)
+
 if not exist node_modules (
   echo Lan dau chay: dang cai thu vien, mat khoang 1 phut...
   call npm install

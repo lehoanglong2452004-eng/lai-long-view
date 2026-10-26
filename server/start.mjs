@@ -34,5 +34,6 @@ createServer((req, res) => {
   }
 }).on('error', (e) => {
   console.error(e.code === 'EADDRINUSE' ? `Cổng ${port} đang bận: có thể Lai Long View đã chạy sẵn, mở ${`http://localhost:${port}`}` : e.message);
-  process.exit(1);
+  // Exit code 3 tells server/chay-ngam.cmd another copy already serves the port, so it must not restart.
+  process.exit(e.code === 'EADDRINUSE' ? 3 : 1);
 });
