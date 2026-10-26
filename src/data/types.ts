@@ -11,8 +11,14 @@ export const TF_MS: Record<TF, number> = {
 export type SourceId = 'binance' | 'binance-perp' | 'okx' | 'okx-swap' | 'bybit' | 'bybit-perp' | 'hyperliquid' | 'yahoo' | 'vn';
 
 export const SOURCE_LABEL: Record<SourceId, string> = {
-  binance: 'Binance', 'binance-perp': 'Binance Perp', okx: 'OKX', 'okx-swap': 'OKX Swap', bybit: 'Bybit',
-  'bybit-perp': 'Bybit Perp', hyperliquid: 'Hyperliquid', yahoo: 'Yahoo', vn: 'VNDirect',
+  binance: 'Binance Spot', 'binance-perp': 'Binance Futures', okx: 'OKX Spot', 'okx-swap': 'OKX Futures', bybit: 'Bybit Spot',
+  'bybit-perp': 'Bybit Futures', hyperliquid: 'Hyperliquid Futures', yahoo: 'Yahoo', vn: 'VNDirect',
+};
+
+/** Crypto-exchange markets, split so spot and futures volume are never mixed up. */
+export const MARKET_TYPE: Partial<Record<SourceId, 'spot' | 'futures'>> = {
+  binance: 'spot', okx: 'spot', bybit: 'spot',
+  'binance-perp': 'futures', 'okx-swap': 'futures', 'bybit-perp': 'futures', hyperliquid: 'futures',
 };
 
 export interface Status { mode: 'rt' | 'delay' | 'eod' | 'unknown'; delayMin?: number }

@@ -100,6 +100,6 @@ export const CATALOG = [
     sources: [{ source: 'vn', symbol: code }, { source: 'yahoo', symbol: `${code}.VN`, note: 'HOSE' }],
   })),
 
-  { key: 'BTC', kind: 'crypto', vi: 'Bitcoin', en: 'Bitcoin', q: ['btc', 'bitcoin'], sources: [{ source: 'binance', symbol: 'BTCUSDT' }, { source: 'binance-perp', symbol: 'BTCUSDT' }, { source: 'okx', symbol: 'BTC-USDT' }, { source: 'bybit', symbol: 'BTCUSDT' }, { source: 'hyperliquid', symbol: 'BTC' }] },
-  { key: 'ETH', kind: 'crypto', vi: 'Ethereum', en: 'Ethereum', q: ['eth', 'ethereum'], sources: [{ source: 'binance', symbol: 'ETHUSDT' }, { source: 'binance-perp', symbol: 'ETHUSDT' }, { source: 'okx', symbol: 'ETH-USDT' }, { source: 'bybit', symbol: 'ETHUSDT' }, { source: 'hyperliquid', symbol: 'ETH' }] },
+  { key: 'BTC', kind: 'crypto', vi: 'Bitcoin', en: 'Bitcoin', q: ['btc', 'bitcoin'], sources: [{ source: 'binance', symbol: 'BTCUSDT' }, { source: 'binance-perp', symbol: 'BTCUSDT' }, { source: 'okx', symbol: 'BTC-USDT' }, { source: 'okx-swap', symbol: 'BTC-USDT-SWAP' }, { source: 'bybit', symbol: 'BTCUSDT' }, { source: 'bybit-perp', symbol: 'BTCUSDT' }, { source: 'hyperliquid', symbol: 'BTC' }] },
+  { key: 'ETH', kind: 'crypto', vi: 'Ethereum', en: 'Ethereum', q: ['eth', 'ethereum'], sources: [{ source: 'binance', symbol: 'ETHUSDT' }, { source: 'binance-perp', symbol: 'ETHUSDT' }, { source: 'okx', symbol: 'ETH-USDT' }, { source: 'okx-swap', symbol: 'ETH-USDT-SWAP' }, { source: 'bybit', symbol: 'ETHUSDT' }, { source: 'bybit-perp', symbol: 'ETHUSDT' }, { source: 'hyperliquid', symbol: 'ETH' }] },
 ];

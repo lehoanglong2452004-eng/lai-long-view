@@ -1,47 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { ChartEngine, type Overlays } from '../chart/ChartEngine';
 import { analyze, lastAnchor } from '../engine/analyze';
 import { buildStory, type Story } from '../engine/context';
 import { avwap, vwapPeriodic } from '../engine/indicators';
-import type { Bar } from '../engine/types';
-import { FEEDS, mergeBar } from '../data/feeds';
-import { SOURCE_LABEL, TF_MS, TIMEFRAMES, type SourceId, type Status, type TF } from '../data/types';
+import { aggSourcesOf, useSeries } from '../data/series';
+import { SOURCE_LABEL, TF_MS, TIMEFRAMES, type Status, type TF } from '../data/types';
 import { statusLabel, statusTitle, t } from '../i18n';
 import type { ChartCfg, Settings } from '../store';
 import type { SyncBus } from '../sync';
 
 export interface PaneStory { story: Story | null; status?: Status; error?: string; bars: number }
-
-interface Series { key: string; bars: Bar[]; status?: Status; error?: string; loading: boolean }
-
-function useSeries(source: SourceId, symbol: string, tf: TF): Series {
-  const key = `${source}:${symbol}:${tf}`;
-  const [s, set] = useState<Series>({ key, bars: [], loading: true });
-  useEffect(() => {
-    let alive = true;
-    let current: Bar[] = [];
-    let queue: Bar[] = [];
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let unsub = () => {};
-    set({ key, bars: [], loading: true });
-    FEEDS[source].history(symbol, tf).then((h) => {
-      if (!alive) return;
-      current = h.bars;
-      set({ key, bars: current, status: h.status, loading: false });
-      unsub = FEEDS[source].subscribe(symbol, tf, (b) => {
-        queue.push(b);
-        timer ??= setTimeout(() => {
-          timer = undefined;
-          for (const q of queue) current = mergeBar(current, q);
-          queue = [];
-          if (alive) set((prev) => ({ ...prev, bars: current }));
-        }, 500);
-      });
-    }).catch((e) => alive && set({ key, bars: [], loading: false, error: String(e?.message || e) }));
-    return () => { alive = false; unsub(); clearTimeout(timer); };
-  }, [key, source, symbol, tf]);
-  return s;
-}
 
 interface Props {
   cfg: ChartCfg;
@@ -61,7 +29,8 @@ export function ChartPane({ cfg, settings, active, maximized, canRemove, bus, on
   const lang = settings.lang;
   const src = cfg.inst.sources[cfg.src] ?? cfg.inst.sources[0];
   const tf = settings.sync ? settings.syncTf : cfg.tf;
-  const series = useSeries(src.source, src.symbol, tf);
+  const aggCandidates = useMemo(() => (cfg.inst.kind === 'crypto' ? aggSourcesOf(src, cfg.inst.sources) : []), [cfg.inst, src]);
+  const series = useSeries(src, tf, cfg.agg ? aggCandidates : []);
   const hostRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<ChartEngine | null>(null);
   const lastKey = useRef('');
@@ -114,10 +83,12 @@ export function ChartPane({ cfg, settings, active, maximized, canRemove, bus, on
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
-    const reset = lastKey.current !== series.key;
-    if (series.bars.length) lastKey.current = series.key;
+    // Merged volume trims the series to the span every exchange covers, so re-center once when it arrives.
+    const viewKey = series.key + (series.agg ? ':agg' : '');
+    const reset = lastKey.current !== viewKey;
+    if (series.bars.length) lastKey.current = viewKey;
     e.setData(series.bars, overlays, reset);
-  }, [series.bars, series.key, overlays]);
+  }, [series.bars, series.key, series.agg, overlays]);
 
   useEffect(() => {
     const e = engineRef.current;
@@ -151,6 +122,20 @@ export function ChartPane({ cfg, settings, active, maximized, canRemove, bus, on
         </select>
         <span className={`badge ${status?.mode ?? 'unknown'}`} title={statusTitle(status, lang)}>{statusLabel(status, lang)}</span>
         {noVol && <span className="badge novol" title={t('noVolume', lang)}>NO VOL</span>}
+        {aggCandidates.length > 0 && (
+          <button className={`agg${cfg.agg ? ' on' : ''}`} title={t('aggHint', lang)} onClick={(e) => { e.stopPropagation(); onChange({ agg: !cfg.agg }); }}>
+            {t('aggVol', lang)}
+          </button>
+        )}
+        {cfg.agg && series.aggPending && <span className="badge unknown">{t('aggLoading', lang)}</span>}
+        {cfg.agg && series.agg && (
+          <span
+            className="badge agg-badge"
+            title={[`Spot: ${series.agg.spot.join(', ') || '—'}`, `Futures: ${series.agg.futures.join(', ') || '—'}`, series.agg.skipped.length ? `${t('aggSkipped', lang)}: ${series.agg.skipped.map((x) => `${x.name} (${t(x.why === 'error' ? 'aggError' : 'aggMismatch', lang)})`).join(', ')}` : ''].filter(Boolean).join(' · ')}
+          >
+            <span className="vs">Spot ×{series.agg.spot.length}</span> · <span className="vf">Futures ×{series.agg.futures.length}</span>
+          </span>
+        )}
         <select className="tf" value={tf} disabled={settings.sync} onChange={(e) => onChange({ tf: e.target.value as TF })} title={settings.sync ? t('syncHint', lang) : undefined}>
           {TIMEFRAMES.map((x) => <option key={x} value={x}>{x}</option>)}
         </select>

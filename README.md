@@ -5,11 +5,14 @@ Biểu đồ đa khung cho trader cá nhân, đọc thị trường theo ba quy 
 - `docs/SPEC.md` — bản đặc tả: mọi quyết định, nguồn dữ liệu, định nghĩa sự kiện và cách chấm điểm mẫu hình.
 - `pine/LaiLong_VolumeContext.pine` — indicator TradingView (Pine Script v6), một indicator gộp tất cả.
 - `src/` — web Lai Long View (React + TypeScript, engine vẽ chart tự viết trên Canvas).
-- `server/` — máy chủ dữ liệu cục bộ (proxy Yahoo Finance, VNDirect và tìm kiếm mã).
+- `server/` — máy chủ dữ liệu cục bộ (proxy Yahoo Finance, VNDirect, tìm kiếm mã, lưu bố cục).
+- `docs/DATA.md` — dữ liệu xem được theo từng sản phẩm, nguồn, độ trễ và độ sâu lịch sử.
 
 ## Chạy web
 
-Cần Node.js 20 trở lên.
+Trên Windows: bấm đúp **`Mo Lai Long View.cmd`**. File tự cài thư viện lần đầu, build bản mới nhất và mở trình duyệt ở http://localhost:4173. Giữ cửa sổ đen mở trong lúc xem; đóng cửa sổ là tắt web.
+
+Chạy bằng lệnh (cần Node.js 20 trở lên):
 
 ```bash
 npm install

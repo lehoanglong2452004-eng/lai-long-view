@@ -5,3 +5,4 @@ dist/
 .env
 .env.*
 tsconfig.tsbuildinfo
+data/

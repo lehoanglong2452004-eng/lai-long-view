@@ -26,8 +26,9 @@ Mọi luật phân tích nằm ở đây; code Pine (`pine/`) và code web (`src
 | Khung thời gian | 1M · 1W · 1D · 4H · 1H · 30m · 15m · 5m · 1m |
 | Khung thời gian mỗi chart | Mỗi chart tự chọn; có công tắc **Đồng bộ** để mọi chart dùng chung khung và chung con trỏ thời gian |
 | Volume profile | Nút bật/tắt cạnh khung thời gian; mặc định nằm bên phải; vị trí, độ rộng, số hàng tùy chỉnh |
-| VWAP | Phiên / tuần / tháng + dải σ; AVWAP tự neo tại sự kiện Wyckoff + neo thủ công bằng click |
-| Crypto | Spot và perp; gộp volume nhiều sàn là tùy chọn trong phần cài đặt, mặc định tắt |
+| VWAP | Phiên / tuần / tháng + dải σ; AVWAP tự neo tại sự kiện Wyckoff (bỏ neo thủ công bằng click, quyết định ngày 26/10/2026) |
+| Crypto | Spot và Futures (perp). Nút "Gộp vol" trên từng chart crypto (mặc định tắt) cộng volume cùng cặp ở mọi sàn, luôn tách riêng phần Spot và phần Futures |
+| Bố cục | Lưu và mở lại nhiều bố cục; lưu trên máy chủ Lai Long View (`data/layouts.json`) để mọi thiết bị dùng chung |
 | Câu chuyện bối cảnh | Tab riêng tên **Bối cảnh** (EN: *Context*) |
 | Cảnh báo | Có (Pine: alertcondition; web: thông báo trình duyệt — giai đoạn sau) |
 | TradingView | Gói Free → gộp mọi thứ vào **một** indicator duy nhất |
@@ -39,7 +40,7 @@ Mọi luật phân tích nằm ở đây; code Pine (`pine/`) và code web (`src
 │ [Tìm mã: vàng / gold / XAU / GC=F]  1M 1W 1D 4H 1H 30m 15m 5m 1m  [VP] [VWAP] │
 │ [Đồng bộ ◯]  [Bố cục ▦ 1..12]  [Màu]  [VI|EN]          [ Biểu đồ | Bối cảnh ] │
 ├───────────────────────────────┬──────────────────────────────────────────────┤
-│ DXY · Hyperliquid · RT  5m [–][□]│ XAUUSDT · Binance Perp · RT  1H  [–][□]   │
+│ DXY · Hyperliquid · RT  5m [–][□]│ XAUUSDT · Binance Futures · RT  1H  [–][□]   │
 │        (chữ chìm Lai Long)     │                                              │
 │                         ▐▐▐ VP │                                              │
 │ 龍 lailong                      │ 龍 lailong                                    │
@@ -81,8 +82,17 @@ Nguồn mặc định cho 3 chart mở đầu (ưu tiên realtime):
 | Chart | Nguồn mặc định | Nguồn thay thế |
 |---|---|---|
 | DXY | Hyperliquid `xyz:DXY` (RT) | Yahoo `DX-Y.NYB` (trễ 30', không volume) |
-| Vàng | Binance Perp `XAUUSDT` (RT) | Hyperliquid `xyz:GOLD`, Yahoo `GC=F` (COMEX, trễ 30') |
-| Dầu WTI | Binance Perp `CLUSDT` (RT) | Hyperliquid `xyz:CL`, Yahoo `CL=F` (NYMEX, trễ 30') |
+| Vàng | Binance Futures `XAUUSDT` (RT) | Hyperliquid `xyz:GOLD`, Yahoo `GC=F` (COMEX, trễ 30') |
+| Dầu WTI | Binance Futures `CLUSDT` (RT) | Hyperliquid `xyz:CL`, Yahoo `CL=F` (NYMEX, trễ 30') |
+
+### 4.1 Gộp volume crypto
+
+- Chỉ áp dụng cho mã crypto. Các thị trường cùng cặp trên Binance, OKX, Bybit (Spot và Futures) và Hyperliquid (Futures) được cộng volume; giá vẫn lấy từ nguồn đang chọn.
+- Volume mọi sàn quy về số coin. Cột volume chồng hai màu: Spot ở dưới, Futures ở trên; dòng chú thích ghi số và phần trăm từng phần.
+- Một sàn bị bỏ qua khi tải lỗi hoặc giờ mở nến khác (ví dụ nến tuần Hyperliquid bắt đầu thứ Năm). Huy hiệu trên chart ghi rõ sàn nào được gộp, sàn nào bị bỏ qua và vì sao.
+- Chuỗi gộp bắt đầu từ nến mà mọi sàn được gộp đều có dữ liệu, để volume không nhảy vọt ở chỗ một sàn mới bắt đầu.
+
+Bảng dữ liệu xem được theo từng sản phẩm: `docs/DATA.md`.
 
 ## 5. Tìm kiếm mã
 
@@ -229,7 +239,6 @@ Loại cấu trúc: vùng sideway hình thành sau xu hướng giảm → **tíc
 
 - VWAP phiên (ngày), tuần, tháng; dải ±1σ, ±2σ.
 - AVWAP tự neo: một đường từ sự kiện tăng gần nhất (`SC`, `SPRING`, `SOS`), một đường từ sự kiện giảm gần nhất (`BC`, `UT`, `SOW`).
-- AVWAP thủ công: click vào nến để neo (web).
 - Luật ví dụ: giá test lại AVWAP từ `SOS` với `RVOL ≤ 0.85` → tăng điểm cho `LPS` (mẫu 19 biến thể ▲).
 
 ### 7.7 Volume profile
@@ -241,7 +250,7 @@ Loại cấu trúc: vùng sideway hình thành sau xu hướng giảm → **tíc
 ### 7.8 Câu chuyện bối cảnh (tab Bối cảnh / bảng Pine)
 
 ```
-XAUUSDT · 1H · Binance Perp · RT
+XAUUSDT · 1H · Binance Futures · RT
 Cung–cầu     : Cầu kiểm soát (giá > VWAP tuần, VWAP dốc lên)
 Nỗ lực/KQ    : Hấp thụ ở vùng thấp (RVOL 2.3, biên độ 0.6 ATR)
 Nhân–quả     : Sideway 46 nến, rộng 4.1 ATR → mục tiêu 2415 / 2440
@@ -274,5 +283,5 @@ TradingView gói Free giới hạn số cảnh báo đang chạy, nên chọn s�
 | 0 | Bản đặc tả này |
 | 1 | Indicator Pine Script v6 "Lai Long Volume Context" (một indicator gộp tất cả) |
 | 2 | Web: khung giao diện, engine chart, đa biểu đồ, dữ liệu crypto + Hyperliquid + Yahoo + VN, tìm kiếm song ngữ, VP, VWAP, tab Bối cảnh |
-| 3 | AVWAP thủ công, gộp volume nhiều sàn, cảnh báo trên web, lưu bố cục |
+| 3 | Gộp volume nhiều sàn (xong), lưu bố cục (xong), bố cục có sẵn, bản điện thoại, cảnh báo trên web |
 | 4 | Công cụ vẽ, backtest luật, tinh chỉnh trọng số theo kết quả thống kê |

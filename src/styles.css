@@ -111,6 +111,14 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 2p
 .settings .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .settings .row input[type='number'] { width: 64px; }
 .settings .check { display: flex; gap: 6px; align-items: center; }
+.layout-save { display: flex; gap: 4px; }
+.layout-save input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 2px; padding: 3px 6px; background: var(--bg); }
+.layout-save input:focus { outline: none; border-color: var(--accent); }
+.field-error { font-size: 11px; color: var(--down); }
+.layout-row { display: flex; gap: 4px; align-items: stretch; }
+.layout-open { flex: 1; min-width: 0; display: flex; justify-content: space-between; gap: 8px; text-align: left; }
+.layout-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layout-row .icon { padding: 0 8px; }
 
 main.charts { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 4px; gap: 4px; }
 main.charts.hidden { display: none; }
@@ -127,6 +135,10 @@ main.charts.hidden { display: none; }
 .pane-head .src { max-width: 180px; min-width: 56px; font-size: 11px; flex-shrink: 1; }
 .pane-head .tf { font-size: 11px; }
 .pane-head .icon { padding: 0 6px; line-height: 16px; }
+.pane-head .agg { font-size: 11px; padding: 0 6px; line-height: 16px; }
+.badge.agg-badge { color: var(--text); border-color: var(--line); }
+.agg-badge .vs { color: #2b5fb8; }
+.agg-badge .vf { color: #b8742b; }
 .pane-body { flex: 1; min-height: 0; position: relative; }
 .canvas-host { position: absolute; inset: 0; }
 .pane-msg { position: absolute; top: 40%; left: 0; right: 0; text-align: center; color: var(--muted); pointer-events: none; }

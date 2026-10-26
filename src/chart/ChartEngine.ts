@@ -247,7 +247,7 @@ export class ChartEngine {
     const n = bars.length;
     const pw = this.plotW, ph = this.plotH;
     const volH = this.hasVol ? Math.round(ph * 0.18) : 0;
-    const pTop = 26, pBot = ph - volH - 8;
+    const pTop = bars.length && bars[bars.length - 1].vf !== undefined ? 38 : 26, pBot = ph - volH - 8;
 
     if (this.opts.watermark) {
       const size = Math.max(18, Math.min(pw * 0.11, (pBot - pTop) * 0.24));
@@ -336,13 +336,22 @@ export class ChartEngine {
       }
     }
 
-    // Volume bars.
+    // Volume bars; merged volume is stacked: spot at the bottom, futures on top, each in its own color.
     if (this.hasVol && maxV > 0) {
       for (let i = from; i <= to; i++) {
         const b = bars[i];
         const vh = (b.v / maxV) * (volH - 4);
-        ctx.fillStyle = withAlpha(b.c >= b.o ? T.up : T.down, 0.35);
-        ctx.fillRect(Math.round(this.x(i) - bodyW / 2), ph - vh, bodyW, vh);
+        const xx = Math.round(this.x(i) - bodyW / 2);
+        if (b.vs !== undefined && b.vf !== undefined) {
+          const sh = b.v > 0 ? (b.vs / b.v) * vh : 0;
+          ctx.fillStyle = withAlpha(T.volSpot, 0.65);
+          ctx.fillRect(xx, ph - sh, bodyW, sh);
+          ctx.fillStyle = withAlpha(T.volFut, 0.45);
+          ctx.fillRect(xx, ph - vh, bodyW, vh - sh);
+        } else {
+          ctx.fillStyle = withAlpha(b.c >= b.o ? T.up : T.down, 0.35);
+          ctx.fillRect(xx, ph - vh, bodyW, vh);
+        }
       }
     }
 
@@ -359,7 +368,14 @@ export class ChartEngine {
     }
 
     // VWAP lines.
-    const line = (arr: number[] | undefined, color: string, width = 1.4, dash: number[] = []) => {
+    // Periodic VWAPs restart each day / week / month: break the line there instead of drawing a jump.
+    const periodOf = (t: number, p: 'D' | 'W' | 'M') => {
+      const d = new Date(t);
+      if (p === 'D') return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      if (p === 'M') return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+      return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    };
+    const line = (arr: number[] | undefined, color: string, width = 1.4, dash: number[] = [], period?: 'D' | 'W' | 'M') => {
       if (!arr) return;
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
@@ -369,16 +385,16 @@ export class ChartEngine {
       for (let i = Math.max(0, from - 1); i <= to; i++) {
         const v = arr[i];
         if (!Number.isFinite(v)) { on = false; continue; }
-        const prevBreak = i > 0 && this.opts.tfMs < 86_400_000 && arr === this.ov.vwapD && Number.isFinite(arr[i - 1]) && new Date(bars[i].t).getUTCDate() !== new Date(bars[i - 1].t).getUTCDate();
+        const prevBreak = !!period && i > 0 && periodOf(bars[i].t, period) !== periodOf(bars[i - 1].t, period);
         if (!on || prevBreak) { ctx.moveTo(this.x(i), y(v)); on = true; } else ctx.lineTo(this.x(i), y(v));
       }
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.lineWidth = 1;
     };
-    line(this.ov.vwapM, T.vwapM);
-    line(this.ov.vwapW, T.vwapW);
-    line(this.ov.vwapD, T.vwapD);
+    line(this.ov.vwapM, T.vwapM, 1.4, [], 'M');
+    line(this.ov.vwapW, T.vwapW, 1.4, [], 'W');
+    line(this.ov.vwapD, T.vwapD, 1.4, [], 'D');
     line(this.ov.avwapBull, T.up, 1.2, [6, 4]);
     line(this.ov.avwapBear, T.down, 1.2, [6, 4]);
 
@@ -517,6 +533,14 @@ export class ChartEngine {
     }
     ctx.fillStyle = col;
     ctx.fillText(`${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`, xx, 12);
+    if (b.vs !== undefined && b.vf !== undefined) {
+      let x2 = 8;
+      for (const [k, v, c] of [['Spot', b.vs, T.volSpot], ['Futures', b.vf, T.volFut]] as const) {
+        ctx.fillStyle = c; ctx.fillRect(x2, 22, 8, 8); x2 += 12;
+        ctx.fillStyle = T.muted; ctx.fillText(k, x2, 26); x2 += ctx.measureText(k).width + 4;
+        ctx.fillStyle = T.text; ctx.fillText(`${fmtVol(v)} (${b.v > 0 ? Math.round((v / b.v) * 100) : 0}%)`, x2, 26); x2 += ctx.measureText(`${fmtVol(v)} (100%)`).width + 12;
+      }
+    }
   }
 
   private fmtTime(dt: Date, newDay: boolean) {

@@ -6,6 +6,9 @@ export interface Bar {
   l: number;
   c: number;
   v: number;
+  /** With multi-exchange volume on: the spot and futures parts of `v`. */
+  vs?: number;
+  vf?: number;
 }
 
 export type Dir = 1 | -1 | 0;

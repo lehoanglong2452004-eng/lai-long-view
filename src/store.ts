@@ -9,6 +9,8 @@ export interface ChartCfg {
   src: number;
   tf: TF;
   minimized: boolean;
+  /** Crypto only: add the volume of the same market on the other exchanges (spot and futures kept apart). */
+  agg?: boolean;
 }
 
 export interface Settings {

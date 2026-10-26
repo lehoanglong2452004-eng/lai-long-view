@@ -6,6 +6,7 @@ import { SyncBus } from './sync';
 import { ChartPane, type PaneStory } from './ui/ChartPane';
 import { ContextTab } from './ui/ContextTab';
 import { SearchBox } from './ui/SearchBox';
+import { LayoutMenu, type SavedLayout } from './ui/LayoutMenu';
 import { SettingsPanel } from './ui/SettingsPanel';
 
 function makeChart(cat: Instrument[], key: string, tf: TF): ChartCfg | null {
@@ -65,6 +66,12 @@ export function App() {
     return { ...s, charts: list, activeId, maxId: list.some((c) => c.id === s.maxId) ? s.maxId : null };
   });
 
+  const loadLayout = (l: SavedLayout) => setState((s) => {
+    if (!s) return s;
+    const list = l.state.charts.slice(0, 12).map((c) => ({ ...c, id: newId() }));
+    return { ...s, charts: list, activeId: list[0].id, maxId: null, settings: { ...s.settings, sync: l.state.sync, syncTf: l.state.syncTf ?? s.settings.syncTf } };
+  });
+
   const pickTf = (tf: TF) => {
     if (settings.sync) setSettings({ syncTf: tf });
     else patchChart(active.id, { tf });
@@ -101,6 +108,7 @@ export function App() {
             {Array.from({ length: 12 }, (_, k) => k + 1).map((k) => <option key={k} value={k}>{k}</option>)}
           </select>
         </label>
+        <LayoutMenu lang={lang} current={() => ({ charts, sync: settings.sync, syncTf: settings.syncTf })} onLoad={loadLayout} />
         <div className="settings-wrap">
           <button className={showSettings ? 'on' : ''} onClick={() => setShowSettings((v) => !v)}>{t('settings', lang)}</button>
           {showSettings && <SettingsPanel settings={settings} onChange={setSettings} />}

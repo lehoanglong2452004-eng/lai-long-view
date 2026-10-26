@@ -12,6 +12,8 @@ export interface ChartTheme {
   vwapM: string;
   vp: string;
   vpPoc: string;
+  volSpot: string;
+  volFut: string;
   crosshair: string;
   watermark: string;
 }
@@ -29,6 +31,8 @@ export const LIGHT_THEME: ChartTheme = {
   vwapM: '#7a3db8',
   vp: '#5a5a5a',
   vpPoc: '#e08a00',
+  volSpot: '#2b5fb8',
+  volFut: '#b8742b',
   crosshair: '#8a8a8a',
   watermark: '#000000',
 };
@@ -57,6 +61,8 @@ export const THEME_LABELS: Array<[keyof ChartTheme, string, string]> = [
   ['vwapM', 'VWAP tháng', 'Monthly VWAP'],
   ['vp', 'Volume profile', 'Volume profile'],
   ['vpPoc', 'POC', 'POC'],
+  ['volSpot', 'Volume Spot (gộp)', 'Spot volume (merged)'],
+  ['volFut', 'Volume Futures (gộp)', 'Futures volume (merged)'],
   ['watermark', 'Chữ chìm', 'Watermark'],
 ];
 

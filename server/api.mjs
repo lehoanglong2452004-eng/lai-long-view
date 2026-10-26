@@ -1,6 +1,7 @@
 // Máy chủ dữ liệu cục bộ: proxy Yahoo Finance và VNDirect (không cho gọi thẳng từ trình duyệt),
 // và tìm kiếm mã gộp từ mọi nguồn. Chỉ dùng cá nhân.
 import { CATALOG } from './catalog.mjs';
+import { handleLayouts } from './layouts.mjs';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36';
 const HOUR = 3600_000;
@@ -36,13 +37,24 @@ export function normalize(s) {
 
 const YAHOO_TF = {
   '1m': ['1m', '7d'], '5m': ['5m', '60d'], '15m': ['15m', '60d'], '30m': ['30m', '60d'],
-  '1H': ['60m', '730d'], '4H': ['60m', '730d'], '1D': ['1d', '10y'], '1W': ['1wk', 'max'], '1M': ['1mo', 'max'],
+  // range=max makes Yahoo fall back to 3-month bars, so weekly/monthly use the longest range that keeps them.
+  '1H': ['60m', '730d'], '4H': ['60m', '730d'], '1D': ['1d', '10y'], '1W': ['1wk', '20y'], '1M': ['1mo', '50y'],
 };
 
-export function aggregate(bars, ms) {
+const WEEK = 7 * 24 * HOUR;
+const MONDAY = 4 * 24 * HOUR; // 1970-01-05, the first Monday after the epoch
+
+/** Bucket start for fixed-length buckets, or calendar weeks (Monday, UTC) and months. */
+function bucketOf(t, size) {
+  if (size === 'W') return Math.floor((t - MONDAY) / WEEK) * WEEK + MONDAY;
+  if (size === 'M') { const d = new Date(t); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1); }
+  return Math.floor(t / size) * size;
+}
+
+export function aggregate(bars, size) {
   const out = [];
   for (const b of bars) {
-    const t = Math.floor(b.t / ms) * ms;
+    const t = bucketOf(b.t, size);
     const last = out[out.length - 1];
     if (last && last.t === t) {
       last.h = Math.max(last.h, b.h); last.l = Math.min(last.l, b.l); last.c = b.c; last.v += b.v;
@@ -99,7 +111,8 @@ async function yahooSearch(q) {
 
 // ---------- Việt Nam (VNDirect dchart) ----------
 
-const VN_RES = { '1m': '1', '5m': '5', '15m': '15', '30m': '30', '1H': '60', '4H': '60', '1D': 'D', '1W': 'W', '1M': 'M' };
+// dchart has no weekly/monthly resolution: those are built from daily bars.
+const VN_RES = { '1m': '1', '5m': '5', '15m': '15', '30m': '30', '1H': '60', '4H': '60', '1D': 'D', '1W': 'D', '1M': 'D' };
 // dchart trả 406 nếu khoảng intraday quá dài (> ~120 ngày với nến 60 phút).
 const VN_SPAN_DAYS = { '1m': 5, '5m': 20, '15m': 40, '30m': 60, '1H': 120, '4H': 120, '1D': 3650, '1W': 7300, '1M': 9000 };
 
@@ -109,6 +122,8 @@ async function vnHistory(symbol, tf) {
   const j = await getJson(`https://dchart-api.vndirect.com.vn/dchart/history?resolution=${VN_RES[tf] || 'D'}&symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}`);
   let bars = (j.t || []).map((t, k) => ({ t: t * 1000, o: j.o[k], h: j.h[k], l: j.l[k], c: j.c[k], v: j.v?.[k] || 0 }));
   if (tf === '4H') bars = aggregate(bars, 4 * HOUR);
+  if (tf === '1W') bars = aggregate(bars, 'W');
+  if (tf === '1M') bars = aggregate(bars, 'M');
   return { bars: bars.slice(-3000), meta: { name: symbol, exchange: 'VN', status: { mode: 'unknown' } } };
 }
 
@@ -261,6 +276,10 @@ export async function apiMiddleware(req, res, next) {
   try {
     if (url.pathname === '/api/search') return send(res, 200, await search(p.get('q')));
     if (url.pathname === '/api/catalog') return send(res, 200, CATALOG.map(catalogResult));
+    if (url.pathname === '/api/layouts') {
+      const r = await handleLayouts(req, url);
+      return send(res, r.status, r.body);
+    }
     if (url.pathname === '/api/yahoo/chart') {
       const sym = p.get('symbol'), tf = p.get('tf') || '1D';
       return send(res, 200, await cached(`yc:${sym}:${tf}`, 10_000, () => yahooChart(sym, tf)));

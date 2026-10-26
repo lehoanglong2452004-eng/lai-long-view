@@ -80,17 +80,34 @@ const binance = (perp: boolean) => ({
 
 const OKX_TF: Record<TF, string> = { '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m', '1H': '1H', '4H': '4H', '1D': '1Dutc', '1W': '1Wutc', '1M': '1Mutc' };
 
+// OKX allows about 20 history requests per 2 s and answers "Too Many Requests" inside a 200 response,
+// so requests go one at a time and are retried when OKX reports an error code.
+let okxChain: Promise<unknown> = Promise.resolve();
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function okxGet(url: string): Promise<{ data: string[][] }> {
+  const run = okxChain.then(async () => {
+    for (let attempt = 0; ; attempt++) {
+      const j = await getJson<{ code: string; msg?: string; data: string[][] }>(url);
+      if (j.code === '0') return j;
+      if (attempt >= 3) throw new Error(`OKX ${j.code} ${j.msg ?? ''}`.trim());
+      await pause(700 * (attempt + 1));
+    }
+  });
+  okxChain = run.then(() => pause(120), () => pause(120));
+  return run;
+}
+
 const okx = (swap: boolean) => {
   // Spot: index 5 is volume in base currency. Swap: index 6 is volume in base currency (index 5 is contracts).
   const vi = swap ? 6 : 5;
   const row = (r: string[]): Bar => ({ t: num(r[0]), o: num(r[1]), h: num(r[2]), l: num(r[3]), c: num(r[4]), v: num(r[vi]) });
   return {
     async history(symbol: string, tf: TF): Promise<History> {
-      const first = await getJson<{ data: string[][] }>(`https://www.okx.com/api/v5/market/candles?instId=${symbol}&bar=${OKX_TF[tf]}&limit=300`);
+      const first = await okxGet(`https://www.okx.com/api/v5/market/candles?instId=${symbol}&bar=${OKX_TF[tf]}&limit=300`);
       const all = [...first.data];
       for (let page = 0; page < 5 && all.length; page++) {
         const after = all[all.length - 1][0];
-        const more = await getJson<{ data: string[][] }>(`https://www.okx.com/api/v5/market/history-candles?instId=${symbol}&bar=${OKX_TF[tf]}&after=${after}&limit=100`);
+        const more = await okxGet(`https://www.okx.com/api/v5/market/history-candles?instId=${symbol}&bar=${OKX_TF[tf]}&after=${after}&limit=100`);
         if (!more.data.length) break;
         all.push(...more.data);
       }
@@ -130,7 +147,8 @@ const hlBar = (k: any): Bar => ({ t: num(k.t), o: num(k.o), h: num(k.h), l: num(
 const hyperliquid = {
   async history(symbol: string, tf: TF): Promise<History> {
     const endTime = Date.now();
-    const startTime = endTime - TF_MS[tf] * 1500;
+    // A start before Hyperliquid existed (e.g. 1500 months back) is rejected, so clamp it.
+    const startTime = Math.max(Date.UTC(2019, 0, 1), endTime - TF_MS[tf] * 1500);
     const rows = await getJson<any[]>('https://api.hyperliquid.xyz/info', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
