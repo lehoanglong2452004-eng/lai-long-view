@@ -54,6 +54,7 @@ export function ContextTab({ charts, stories, settings, onOpen }: Props) {
                         </div>
                       ))}
                     </dd>
+                    {ps?.options && <><dt>{t('options', lang)}</dt><dd>{ps.options}</dd></>}
                     <dt>{t('scenario', lang)}</dt><dd>{st.scenario}</dd>
                     <dt>{t('invalidation', lang)}</dt><dd>{st.invalidation}</dd>
                   </dl>

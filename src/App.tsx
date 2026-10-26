@@ -94,6 +94,13 @@ export function App() {
         </div>
         <div className="group">
           <button className={settings.showVP ? 'on' : ''} title={t('vpHint', lang)} onClick={() => setSettings({ showVP: !settings.showVP })}>VP</button>
+          <button className={settings.ovp ? 'on' : ''} title={t('ovpHint', lang)} onClick={() => setSettings({ ovp: !settings.ovp })}>OVP</button>
+          {settings.ovp && (
+            <>
+              <button className={settings.ovpMetric === 'oi' ? 'on' : ''} onClick={() => setSettings({ ovpMetric: 'oi' })}>{t('ovpOi', lang)}</button>
+              <button className={settings.ovpMetric === 'vol' ? 'on' : ''} onClick={() => setSettings({ ovpMetric: 'vol' })}>{t('ovpVol', lang)}</button>
+            </>
+          )}
           <button className={settings.showVWAP ? 'on' : ''} onClick={() => setSettings({ showVWAP: !settings.showVWAP })}>VWAP</button>
           <button className={settings.wyckoff ? 'on' : ''} title={t('eventsHint', lang)} onClick={() => setSettings({ wyckoff: !settings.wyckoff })}>{t('events', lang)}</button>
         </div>

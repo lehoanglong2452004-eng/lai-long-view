@@ -49,7 +49,18 @@ Con số "từ ngày" là nến cũ nhất web tải về ở lần mở chart; 
 | VNDirect (VNM) | 5 ngày | 20 ngày | 4 tháng | 4 tháng | 10 năm | từ 2012 | từ 2013 |
 | VNDirect (VN-Index) | 5 ngày | 20 ngày | 4 tháng | 4 tháng | từ 2017 | từ 2017 | từ 2017 |
 
-## 3. Những điều cần biết
+## 3. Quyền chọn (Options Volume Profile)
+
+| Coin | Deribit | Bybit | OKX | Binance |
+|---|---|---|---|---|
+| BTC | Có (≈1.000 hợp đồng) | Có (≈580) | Có (≈590) | Có (≈500) |
+| ETH | Có (≈840) | Có (≈510) | Có (≈580) | Có (≈460) |
+| SOL | Có (≈410) | Có (≈230) | Không | Có (≈40) |
+
+Đếm ngày 26/10/2026, chỉ tính hợp đồng chưa đáo hạn có OI hoặc volume. Dữ liệu realtime, máy chủ làm mới mỗi 60 giây.
+Binance còn có quyền chọn vàng (XAU) và bạc (XAG). Quyền chọn cổ phiếu, chỉ số Mỹ (CBOE) và hàng hóa CME không có nguồn miễn phí hợp lệ.
+
+## 4. Những điều cần biết
 
 - **Không có volume**: DXY, VIX, lợi suất trái phiếu, mọi cặp forex, Nikkei trong ngày. Với các mã này engine chỉ chạy luật về giá và báo "NO VOL".
 - **Volume vàng, dầu trên sàn crypto** (Binance Futures, Hyperliquid) là volume của người chơi các sàn đó, có cả cuối tuần khi COMEX/NYMEX đóng cửa. Muốn volume COMEX/NYMEX thật thì chọn nguồn Yahoo `GC=F` / `CL=F` (trễ 30').

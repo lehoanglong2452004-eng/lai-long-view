@@ -11,6 +11,16 @@ export interface Overlays {
   avwapBear?: number[];
   events?: EngineEvent[];
   boxes?: Box[];
+  options?: OptionsOverlay;
+}
+
+/** Options open interest / volume per strike, drawn at the right edge (puts left of the axis, calls right). */
+export interface OptionsOverlay {
+  strikes: Array<{ k: number; call: number; put: number }>;
+  maxPain?: number;
+  callWall?: number;
+  putWall?: number;
+  labels: { call: string; put: string; callWall: string; putWall: string; maxPain: string };
 }
 
 export interface ChartOptions {
@@ -325,7 +335,9 @@ export class ChartEngine {
           const ww = (vp.rows[r] / maxRow) * maxW;
           const inVa = pLo >= vp.val - 1e-12 && pHi <= vp.vah + 1e-12;
           ctx.fillStyle = r === vp.poc ? withAlpha(T.vpPoc, 0.7) : withAlpha(inVa ? T.vwapW : T.vp, inVa ? 0.22 : 0.16);
-          const xx = this.opts.vpSide === 'right' ? pw - ww : 0;
+          // The options profile owns the right edge when it is shown, so the volume profile moves left.
+          const vpRight = this.opts.vpSide === 'right' && !this.ov.options?.strikes.length;
+          const xx = vpRight ? pw - ww : 0;
           ctx.fillRect(xx, y1 + 0.5, ww, Math.max(1, y2 - y1 - 1));
         }
         const pocY = y(vp.lo + (vp.poc + 0.5) * vp.step);
@@ -335,6 +347,8 @@ export class ChartEngine {
         ctx.setLineDash([]);
       }
     }
+
+    if (this.ov.options?.strikes.length) this.drawOptions(this.ov.options, y, lo, hi, pTop, pBot, pw, d);
 
     // Volume bars; merged volume is stacked: spot at the bottom, futures on top, each in its own color.
     if (this.hasVol && maxV > 0) {
@@ -482,6 +496,63 @@ export class ChartEngine {
       ctx.fillStyle = T.bg;
       ctx.textAlign = 'center';
       ctx.fillText(tl, cx, ph + TIME_H / 2 + 1);
+    }
+  }
+
+  private drawOptions(op: OptionsOverlay, y: (p: number) => number, lo: number, hi: number, pTop: number, pBot: number, pw: number, d: number) {
+    const { ctx } = this;
+    const T = this.opts.theme;
+    const F = this.opts.font;
+    const area = pw * 0.3;
+    const mid = pw - area / 2;
+    const half = area / 2 - 6;
+    const vis = op.strikes.filter((s) => s.k >= lo && s.k <= hi);
+    const mx = Math.max(0, ...vis.map((s) => Math.max(s.call, s.put)));
+    if (vis.length && mx > 0) {
+      let gap = Infinity;
+      for (let i = 1; i < vis.length; i++) gap = Math.min(gap, y(vis[i - 1].k) - y(vis[i].k));
+      const rh = Math.max(2, Math.min(14, (Number.isFinite(gap) ? gap : 10) * 0.72));
+      for (const s of vis) {
+        const yy = y(s.k) - rh / 2;
+        const wp = (s.put / mx) * half, wc = (s.call / mx) * half;
+        ctx.fillStyle = withAlpha(T.down, s.k === op.putWall ? 0.85 : 0.5);
+        ctx.fillRect(mid - wp, yy, wp, rh);
+        ctx.fillStyle = withAlpha(T.up, s.k === op.callWall ? 0.85 : 0.5);
+        ctx.fillRect(mid, yy, wc, rh);
+      }
+      ctx.strokeStyle = T.axisLine;
+      ctx.beginPath(); ctx.moveTo(mid + 0.5, pTop); ctx.lineTo(mid + 0.5, pBot); ctx.stroke();
+      ctx.font = `10px ${F}`;
+      ctx.textBaseline = 'bottom';
+      ctx.textAlign = 'right'; ctx.fillStyle = T.down; ctx.fillText(op.labels.put, mid - 4, pTop - 2);
+      ctx.textAlign = 'left'; ctx.fillStyle = T.up; ctx.fillText(op.labels.call, mid + 4, pTop - 2);
+    }
+    // Key levels; a level outside the visible prices gets a tag at the top or bottom edge instead.
+    const levels: Array<[number | undefined, string, string]> = [
+      [op.callWall, T.up, op.labels.callWall],
+      [op.putWall, T.down, op.labels.putWall],
+      [op.maxPain, T.vpPoc, op.labels.maxPain],
+    ];
+    ctx.font = `600 10px ${F}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    let above = 0, below = 0;
+    for (const [v, col, label] of levels) {
+      if (v === undefined) continue;
+      const text = `${label} ${v.toFixed(Math.min(d, v % 1 ? 2 : 0))}`;
+      let yy: number;
+      if (v > hi) { yy = pTop + 6 + 13 * above++; ctx.fillStyle = col; ctx.fillText(`↑ ${text}`, 8, yy + 12); continue; }
+      if (v < lo) { yy = pBot - 6 - 13 * below++; ctx.fillStyle = col; ctx.fillText(`↓ ${text}`, 8, yy); continue; }
+      yy = Math.round(y(v)) + 0.5;
+      ctx.strokeStyle = withAlpha(col, 0.85);
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke();
+      ctx.setLineDash([]);
+      const w = ctx.measureText(text).width + 8;
+      ctx.fillStyle = withAlpha(T.bg, 0.85);
+      ctx.fillRect(6, yy - 14, w, 12);
+      ctx.fillStyle = col;
+      ctx.fillText(text, 10, yy - 8);
     }
   }
 

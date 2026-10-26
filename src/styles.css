@@ -134,6 +134,7 @@ main.charts.hidden { display: none; }
 .pane-head .name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; flex-shrink: 1; min-width: 0; }
 .pane-head .src { max-width: 180px; min-width: 56px; font-size: 11px; flex-shrink: 1; }
 .pane-head .tf { font-size: 11px; }
+.pane-head .expiry { font-size: 11px; max-width: 150px; flex-shrink: 1; min-width: 60px; }
 .pane-head .icon { padding: 0 6px; line-height: 16px; }
 .pane-head .agg { font-size: 11px; padding: 0 6px; line-height: 16px; }
 .badge.agg-badge { color: var(--text); border-color: var(--line); }

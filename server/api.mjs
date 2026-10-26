@@ -2,6 +2,7 @@
 // và tìm kiếm mã gộp từ mọi nguồn. Chỉ dùng cá nhân.
 import { CATALOG } from './catalog.mjs';
 import { handleLayouts } from './layouts.mjs';
+import { OPTION_COINS, optionsSnapshot } from './options.mjs';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36';
 const HOUR = 3600_000;
@@ -276,6 +277,11 @@ export async function apiMiddleware(req, res, next) {
   try {
     if (url.pathname === '/api/search') return send(res, 200, await search(p.get('q')));
     if (url.pathname === '/api/catalog') return send(res, 200, CATALOG.map(catalogResult));
+    if (url.pathname === '/api/options') {
+      const coin = String(p.get('coin') || '').toUpperCase();
+      if (!OPTION_COINS.includes(coin)) return send(res, 400, { error: 'unsupported coin' });
+      return send(res, 200, await cached(`opt:${coin}`, 60_000, () => optionsSnapshot(coin, getJson)));
+    }
     if (url.pathname === '/api/layouts') {
       const r = await handleLayouts(req, url);
       return send(res, r.status, r.body);

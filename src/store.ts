@@ -11,12 +11,17 @@ export interface ChartCfg {
   minimized: boolean;
   /** Crypto only: add the volume of the same market on the other exchanges (spot and futures kept apart). */
   agg?: boolean;
+  /** Options profile expiry filter: 'all', 'nearest' or a date (YYYY-MM-DD). */
+  ovpExpiry?: string;
 }
 
 export interface Settings {
   lang: Lang;
   theme: ChartTheme;
   showVP: boolean;
+  /** Options Volume Profile (BTC, ETH, SOL charts). */
+  ovp: boolean;
+  ovpMetric: 'oi' | 'vol';
   vpSide: 'left' | 'right';
   vpWidth: number;
   vpRows: number;
@@ -41,6 +46,8 @@ export const DEFAULT_SETTINGS: Settings = {
   lang: 'vi',
   theme: LIGHT_THEME,
   showVP: true,
+  ovp: false,
+  ovpMetric: 'oi',
   vpSide: 'right',
   vpWidth: 0.24,
   vpRows: 40,

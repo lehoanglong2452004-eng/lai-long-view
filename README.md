@@ -7,6 +7,7 @@ Biểu đồ đa khung cho trader cá nhân, đọc thị trường theo ba quy 
 - `src/` — web Lai Long View (React + TypeScript, engine vẽ chart tự viết trên Canvas).
 - `server/` — máy chủ dữ liệu cục bộ (proxy Yahoo Finance, VNDirect, tìm kiếm mã, lưu bố cục).
 - `docs/DATA.md` — dữ liệu xem được theo từng sản phẩm, nguồn, độ trễ và độ sâu lịch sử.
+- Options Volume Profile (nút OVP): open interest quyền chọn BTC, ETH, SOL theo giá thực hiện, gộp Deribit, Bybit, OKX, Binance.
 
 ## Chạy web
 

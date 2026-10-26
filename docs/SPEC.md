@@ -94,6 +94,17 @@ Nguồn mặc định cho 3 chart mở đầu (ưu tiên realtime):
 
 Bảng dữ liệu xem được theo từng sản phẩm: `docs/DATA.md`.
 
+### 4.2 Options Volume Profile (OVP)
+
+- Nút **OVP** trên thanh công cụ, chỉ có tác dụng với chart BTC, ETH, SOL. Nguồn: Deribit, Bybit, OKX, Binance (OKX không có SOL), gộp lại, quy về số coin, máy chủ làm mới mỗi 60 giây.
+- Mỗi giá thực hiện một hàng ở mép phải chart: Put sang trái (đỏ), Call sang phải (xanh). Mặc định **open interest**; nút **Vol 24h** đổi sang khối lượng 24 giờ. Khi OVP bật, volume profile thường dời sang trái.
+- Ô **kỳ hạn** trên từng chart: tất cả (mặc định), gần nhất, hoặc một ngày cụ thể (kèm % OI của kỳ hạn đó).
+- **Max pain**: giá đáo hạn làm người mua quyền chọn được trả ít nhất, tính theo open interest.
+- **Tường Call / tường Put**: giá thực hiện có OI Call (Put) lớn nhất trong khoảng ±25% quanh giá hiện tại, phía trên (dưới) giá. Luôn tính theo OI, kể cả khi đang xem volume.
+- Mức nằm ngoài khung giá đang nhìn được ghi bằng mũi tên ↑/↓ ở mép chart.
+- Tab Bối cảnh có dòng **Quyền chọn**: vị trí giá so với hai tường và max pain (kèm %), tỉ lệ Put/Call, kỳ hạn và các sàn có dữ liệu.
+- Không có cho vàng, dầu, DXY, cổ phiếu Mỹ (không có nguồn miễn phí hợp lệ). Binance có quyền chọn XAU, XAG: có thể thêm sau.
+
 ## 5. Tìm kiếm mã
 
 - Tìm theo tên tiếng Việt, tên tiếng Anh, mã, ký hiệu: `vàng`, `vang`, `gold`, `XAU`, `GC=F` đều ra vàng.
